@@ -1,0 +1,77 @@
+[tool.poetry]
+name = "ticket-pipeline"
+version = "0.1.0"
+description = "Pipeline automatisée pour traitement de tickets de caisse avec Signal, Dagster et Claude"
+authors = ["Carmelo <ton@email.com>"]
+readme = "README.md"
+packages = [{include = "signal_client.py"}, {include = "ocr_service.py"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+# Signal (wrapper Python uniquement, signal-cli doit être installé séparément)
+python-dotenv = "^1.0.0"
+
+# Dagster pour orchestration
+dagster = "^1.5.0"
+dagster-webserver = "^1.5.0"
+
+# Claude API pour OCR
+anthropic = "^0.8.0"
+
+# Base de données
+sqlalchemy = "^2.0.0"
+alembic = "^1.13.0"
+
+# Dashboard
+plotly = "^5.18.0"
+dash = "^2.14.0"
+pandas = "^2.1.0"
+
+# Utilities
+pydantic = "^2.5.0"
+pytz = "^2023.3"
+
+[tool.poetry.group.dev.dependencies]
+# Testing
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
+pytest-asyncio = "^0.21.0"
+
+# Code quality
+black = "^23.12.0"
+ruff = "^0.1.8"
+mypy = "^1.7.0"
+
+# Debugging
+ipython = "^8.18.0"
+ipdb = "^0.13.0"
+
+[tool.poetry.scripts]
+# Scripts d'entrée
+signal-bot = "signal_bot:main"
+dagster-pipeline = "dagster_pipeline:main"
+dashboard = "dashboard:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "^3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+addopts = "-v --cov=. --cov-report=html --cov-report=term"

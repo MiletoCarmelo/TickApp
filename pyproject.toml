@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "tickapp"
+version = "0.1.0"
+description = ""
+authors = ["mileto <carmeloenzomileto@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.14"
+dagster = "^1.12.3"
+python-dotenv = "^1.2.1"
+dagster-webserver = "^1.12.3"
+anthropic = "^0.74.1"
+sqlalchemy = "^2.0.44"
+alembic = "^1.17.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
