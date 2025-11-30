@@ -1,0 +1,38 @@
+[32m2025-11-30 22:56:51 +0100[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - 136e69f8-4c43-49be-b997-b6ecac3cf1ca - 57113 - LOGS_CAPTURED - Started capturing logs in process (pid: 57113).
+[32m2025-11-30 22:56:51 +0100[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - 136e69f8-4c43-49be-b997-b6ecac3cf1ca - 57113 - message_from_signal - STEP_START - Started execution of step "message_from_signal".
+[32m2025-11-30 22:56:51 +0100[0m - dagster - [34mINFO[0m - __ASSET_JOB - 136e69f8-4c43-49be-b997-b6ecac3cf1ca - message_from_signal - 📱 Récupération du message Signal du ...
+INFO:tickapp.clients.signal_client:✅ Signal Client initialisé pour +33695071416
+DEBUG:tickapp.clients.signal_client:🔧 Commande: signal-cli -a +33695071416 -o json -a +33695071416 receive --max-messages 50 --send-read-receipts
+[32m2025-11-30 22:57:10 +0100[0m - dagster - [34mERROR[0m - [31m__ASSET_JOB - 136e69f8-4c43-49be-b997-b6ecac3cf1ca - 57113 - message_from_signal - STEP_FAILURE - Execution of step "message_from_signal" failed.
+
+dagster._core.errors.DagsterExecutionStepExecutionError: Error occurred while executing op "message_from_signal"::
+
+ValueError: Invalid isoformat string: ''
+
+Stack Trace:
+  File "/opt/anaconda3/envs/tickapp/lib/python3.11/site-packages/dagster/_core/execution/plan/utils.py", line 57, in op_execution_error_boundary
+    yield
+  File "/opt/anaconda3/envs/tickapp/lib/python3.11/site-packages/dagster/_utils/__init__.py", line 394, in iterate_with_context
+    next_output = next(iterator)
+                  ^^^^^^^^^^^^^^
+  File "/opt/anaconda3/envs/tickapp/lib/python3.11/site-packages/dagster/_core/execution/plan/compute_generator.py", line 135, in _coerce_op_compute_fn_to_iterator
+    result = invoke_compute_fn(
+             ^^^^^^^^^^^^^^^^^^
+  File "/opt/anaconda3/envs/tickapp/lib/python3.11/site-packages/dagster/_core/execution/plan/compute_generator.py", line 115, in invoke_compute_fn
+    return fn(context, **args_to_pass) if context_arg_provided else fn(**args_to_pass)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/carmelomileto/Documents/Projects/TickApp/tickapp/assets/message_pipeline.py", line 207, in message_from_signal
+    target_timestamp = datetime.fromisoformat(message_timestamp.replace('Z', ''))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The above exception occurred during handling of the following exception:
+ValueError: Invalid isoformat string: ''
+
+Stack Trace:
+  File "/Users/carmelomileto/Documents/Projects/TickApp/tickapp/assets/message_pipeline.py", line 204, in message_from_signal
+    target_timestamp = datetime.fromisoformat(message_timestamp)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[0m
+INFO:tickapp.clients.signal_client:✅ Signal Client initialisé pour +33695071416
+[32m2025-11-30 22:57:12 +0100[0m - dagster - [34mWARNING[0m - __ASSET_JOB - 136e69f8-4c43-49be-b997-b6ecac3cf1ca - message_from_signal - ⚠️  Erreur lors de l'envoi de notification Signal: 'SignalClient' object has no attribute 'find_group_by_name'
+[32m2025-11-30 22:57:12 +0100[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - 136e69f8-4c43-49be-b997-b6ecac3cf1ca - message_from_signal - HOOK_COMPLETED - Finished the execution of hook "notify_signal_failure" triggered for "message_from_signal".

@@ -10,7 +10,7 @@ services:
     environment:
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5434}:5434"
     volumes:
       - receipt_pgdata:/var/lib/postgresql/data
       - ./pg/init_scripts:/docker-entrypoint-initdb.d:ro  # Scripts exécutés au 1er démarrage

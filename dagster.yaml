@@ -1,8 +1,12 @@
-storage:
-  postgres:
-    postgres_db:
-      username: receipt_user
-      password: receipt_password
-      hostname: localhost
-      db_name: receipt_processing
-      port: 5432
+# Configuration du storage Dagster (optionnel)
+# Si non configuré, Dagster utilise un storage en mémoire
+# Pour la production, vous pouvez décommenter et configurer PostgreSQL :
+#
+# storage:
+#   postgres:
+#     postgres_db:
+#       username: ${DB_USER}
+#       password: ${DB_PASSWORD}
+#       hostname: ${DB_HOST}
+#       db_name: ${DB_NAME}
+#       port: ${DB_PORT}

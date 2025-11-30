@@ -14,7 +14,10 @@ anthropic = "^0.74.1"
 sqlalchemy = "^2.0.44"
 alembic = "^1.17.2"
 psycopg2 = "^2.9.11"
+dagster-postgres = "^0.28.3"
 
+[tool.dagster]
+module_name = "tickapp.assets"
 
 [build-system]
 requires = ["poetry-core"]
