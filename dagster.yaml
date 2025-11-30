@@ -1,0 +1,8 @@
+storage:
+  postgres:
+    postgres_db:
+      username: receipt_user
+      password: receipt_password
+      hostname: localhost
+      db_name: receipt_processing
+      port: 5432

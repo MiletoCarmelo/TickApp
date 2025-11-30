@@ -13,6 +13,7 @@ dagster-webserver = "^1.12.3"
 anthropic = "^0.74.1"
 sqlalchemy = "^2.0.44"
 alembic = "^1.17.2"
+psycopg2 = "^2.9.11"
 
 
 [build-system]

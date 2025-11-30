@@ -1,0 +1,81 @@
+Analyse ce ticket de caisse et extrais toutes les informations des articles achetés.
+
+INSTRUCTIONS :
+1. Identifie le nom du magasin (Migros, Coop, Manor, Interdiscount, Landi, etc.)
+2. Identifie tous les articles listés sur le ticket (même si répartis sur plusieurs images)
+3. Pour chaque article, extrais :
+   - Le nom exact de l'article tel qu'écrit
+   - Le prix unitaire
+   - La quantité (si indiquée)
+   - Le prix total
+
+4. Comprends et catégorise chaque article dans UNE de ces catégories (basées sur les standards bancaires) :
+   
+   ALIMENTATION & BOISSONS :
+   - Alimentation et supermarchés
+   - Restaurants et cafés
+   - Bars et vie nocturne
+   - Boulangeries et pâtisseries
+   
+   COMMERCES :
+   - Vêtements et chaussures
+   - Électronique et informatique
+   - Meubles et décoration
+   - Bricolage et jardinage
+   - Pharmacie et parapharmacie
+   - Librairie et papeterie
+   - Jouets et jeux
+   - Sport et loisirs
+   - Bijouterie et horlogerie
+   
+   MAISON :
+   - Hygiène et beauté
+   - Entretien et nettoyage
+   - Électroménager
+   - Quincaillerie et outillage
+   
+   SERVICES :
+   - Essence et carburant
+   - Télécommunications
+   - Santé et soins médicaux
+   - Services professionnels
+   
+   LOISIRS & CULTURE :
+   - Divertissement et culture
+   - Voyages et tourisme
+   - Cadeaux et fleurs
+   
+   AUTRE :
+   - Divers
+   - Non catégorisé
+
+5. Fournis le résultat UNIQUEMENT en format JSON valide, sans texte supplémentaire, sans backticks :
+
+{
+  "magasin": "nom du magasin",
+  "date": "date du ticket (format YYYY-MM-DD si possible)",
+  "heure": "heure si disponible (format HH:MM)",
+  "adresse_magasin": "adresse si visible sur le ticket",
+  "articles": [
+    {
+      "nom": "nom de l'article",
+      "quantite": 1,
+      "prix_unitaire": 2.50,
+      "prix_total": 2.50,
+      "categorie": "catégorie appropriée parmi la liste ci-dessus",
+      "tva": "taux de TVA si indiqué (2.6%, 8.1%, etc.)"
+    }
+  ],
+  "sous_total": 45.80,
+  "total": 45.80,
+  "mode_paiement": "carte/espèces/autre si indiqué",
+  "devise": "CHF"
+}
+
+IMPORTANT : 
+- Réponds UNIQUEMENT avec le JSON, rien d'autre
+- Si un article est ambigu, choisis la catégorie la plus probable selon son contexte
+- Pour les magasins suisses (Migros, Coop, Manor, Landi, etc.), attention aux abréviations courantes
+- Si plusieurs images sont fournies, combine tous les articles dans une seule liste
+- Utilise EXACTEMENT les noms de catégories listés ci-dessus
+- Pour les articles non-alimentaires, sois attentif au contexte du magasin (ex: câble HDMI = Électronique et informatique, tournevis = Quincaillerie et outillage)

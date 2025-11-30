@@ -1,0 +1,64 @@
+Analyse ce ticket de caisse et extrais toutes les informations des articles achetés.
+
+INSTRUCTIONS :
+1. Identifie le nom du magasin (Migros, Coop, Manor, Interdiscount, Landi, etc.)
+2. Identifie tous les articles listés sur le ticket (même si répartis sur plusieurs images)
+3. Pour chaque article, extrais :
+   - Le nom exact de l'article tel qu'écrit
+   - Le prix unitaire
+   - La quantité (si indiquée)
+   - Le prix total
+
+4. Comprends et catégorise chaque article dans UNE de ces catégories (basées sur les standards bancaires) :
+   
+[item_categories]
+
+5. Identifie à qui appartient cette dépense parmi ces catégories de transaction :
+   
+[transaction_categories]
+
+6. Fournis le résultat UNIQUEMENT en format JSON valide, sans texte supplémentaire, sans backticks :
+
+{
+  "magasin": {
+    "nom": "nom du magasin",
+    "adresse": "adresse si visible sur le ticket",
+    "code_postal": "code postal si visible",
+    "ville": "ville si visible",
+    "pays": "CH",
+    "telephone": "téléphone si visible"
+  },
+  "transaction": {
+    "category_id": ID de la catégorie de transaction (nombre entier, parmi les IDs listés ci-dessus),
+    "numero_ticket": "numéro du ticket si visible",
+    "date": "date du ticket (format YYYY-MM-DD si possible)",
+    "heure": "heure si disponible (format HH:MM:SS)",
+    "mode_paiement": "carte/espèces/autre si indiqué"
+  },
+  "devise": "CHF",
+  "articles": [
+    {
+      "nom": "nom de l'article",
+      "reference": "référence produit si visible",
+      "marque": "marque si visible",
+      "quantite": 1,
+      "prix_unitaire": 2.50,
+      "prix_total": 2.50,
+      "categorie": "catégorie principale appropriée parmi la liste ci-dessus",
+      "sous_categorie": "sous-catégorie appropriée parmi la liste ci-dessus",
+      "tva": "taux de TVA si indiqué (2.6%, 8.1%, etc.)"
+    }
+  ],
+  "total": 45.80
+}
+
+IMPORTANT : 
+- Réponds UNIQUEMENT avec le JSON, rien d'autre
+- Si un article est ambigu, choisis la catégorie la plus probable selon son contexte
+- Pour les magasins suisses (Migros, Coop, Manor, Landi, etc.), attention aux abréviations courantes
+- Si plusieurs images sont fournies, combine tous les articles dans une seule liste
+- Utilise EXACTEMENT les noms de catégories listés ci-dessus
+- Pour les articles non-alimentaires, sois attentif au contexte du magasin (ex: câble HDMI = Électronique et informatique, tournevis = Quincaillerie et outillage)
+- Si tu ne trouves pas de match exact pour une catégorie d'article, choisis la catégorie la plus proche/similaire parmi celles disponibles
+- Pour la transaction_category, utilise l'ID numérique correspondant au nom de la catégorie (ex: si "carmelo" a l'ID 1, utilise 1)
+

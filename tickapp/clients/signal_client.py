@@ -11,6 +11,7 @@ License: MIT
 import json
 import subprocess
 import logging
+import re
 from pathlib import Path
 from typing import List, Dict, Optional, Union, Callable
 from dataclasses import dataclass
@@ -22,7 +23,7 @@ import os
 
 
 # Configuration du logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -44,6 +45,7 @@ class Attachment:
     filename: str
     size: int
     upload_timestamp_ms: int
+    path: Optional[Path] = None
     
     @property
     def is_image(self) -> bool:
@@ -273,29 +275,30 @@ class SignalClient:
             self._run_command(args)
             logger.info(f"✅ Profil mis à jour")
 
-    def receive(self, number_of_messages: int = 1, output_format: str = "json") -> List[Message]:
-        """
-        Reçoit les nouveaux messages d'un groupe
-        
-        Args:
-            group_id: ID du groupe
-            number_of_messages: Nombre de messages à reçu
-        
-        Returns:
-            Liste des messages reçus
-        """
-        if output_format == "json":
-            args = ["-o", "json"]
-        elif output_format == "plain-text":
-            args = ["-o", "plain-text"]
-        else:
-            raise ValueError(f"Format de sortie non valide: {output_format}")
 
-        args.extend(["-a", self.phone_number, "receive" , "--max-messages", str(number_of_messages), "--send-read-receipts"])
+    def receive(self, number_of_messages: int = 100000, output_format: str = "json") -> List[Message]:
+            """
+            Reçoit les nouveaux messages d'un groupe
+            
+            Args:
+                group_id: ID du groupe
+                number_of_messages: Nombre de messages à reçu
+            
+            Returns:
+                Liste des messages reçus
+            """
+            if output_format == "json":
+                args = ["-o", "json"]
+            elif output_format == "plain-text":
+                args = ["-o", "plain-text"]
+            else:
+                raise ValueError(f"Format de sortie non valide: {output_format}")
 
-        result = self._run_command(args)
+            args.extend(["-a", self.phone_number, "receive" , "--max-messages", str(number_of_messages), "--send-read-receipts"])
 
-        return result.stdout
+            result = self._run_command(args)
+
+            return result.stdout
 
     def _convert_to_json(self, data: str) -> Dict:
         """Convertit une chaîne de caractères en JSON"""
@@ -305,76 +308,103 @@ class SignalClient:
             return {}
 
     def _parse_message(self, data: str) -> Optional[Message]:
-        """Parse un message JSON de signal-cli"""
-        data = self._convert_to_json(data)
+            """Parse un message JSON de signal-cli"""
 
-        if data == {}:
-            return Message(
-                sender=Contact(number='', name='', uuid=''),
-                timestamp=datetime.now(),
-                text=None,
-                attachments=[],
-                group=None,
-                is_group_message=False
-            )
+            messages = []
+            for line in data.strip().split('\n'):
+                if line.strip():
+                    msg_json = json.loads(line)
+                    messages.append(msg_json)
+            messages
 
+            output = []
+            for msg_json in messages:
+            
+                if msg_json == {}:
+                    output.append(Message(
+                        sender=Contact(number='', name='', uuid=''),
+                        timestamp=datetime.now(),
+                        text=None,
+                        attachments=[],
+                        group=None,
+                        is_group_message=False
+                    ))
 
-        envelope = data.get('envelope', {})
-        data_message = envelope.get('dataMessage', {})
-        account = envelope.get('account', '')
-        
-        # Sender
-        sender_number = envelope.get('source') or envelope.get('sourceNumber')
-        sender_name = envelope.get('sourceName')
-        sender_uuid = envelope.get('sourceUuid')
-        
-        sender = Contact(
-            number=sender_number,
-            name=sender_name,
-            uuid=sender_uuid
-        )
-        
-        # Timestamp
-        timestamp_ms = envelope.get('timestamp', 0)
-        timestamp = datetime.fromtimestamp(timestamp_ms / 1000)
-        
-        # Text
-        text = data_message.get('message')
-        
-        # Attachments
-        attachments = []
-        for att_data in data_message.get('attachments', []):
-            attachment = Attachment(
-                content_type=att_data.get('contentType', ''),
-                id=att_data.get('id', ''),
-                upload_timestamp_ms=att_data.get('uploadTimestamp', 0),
-                filename=att_data.get('filename', ''),
-                size=att_data.get('size', 0)
-            )
-            attachments.append(attachment)
-        
-        # Group info
-        group = None
-        is_group = False
-        group_info = data_message.get('groupInfo')
-        
-        if group_info:
-            is_group = True
-            group = Group(
-                id=group_info.get('groupId', ''),
-                name=group_info.get('name', 'Unknown')
-            )
-        
-        return Message(
-            sender=sender,
-            timestamp=timestamp,
-            text=text,
-            attachments=attachments,
-            group=group,
-            is_group_message=is_group, 
-            account=account
-        )
+                envelope = msg_json.get('envelope', {})
+                data_message = envelope.get('dataMessage', {})
+                
+                if 'remoteDelete' in data_message:
+                    remote_delete = data_message['remoteDelete']
+                    logger.info(f"🗑️  Message supprimé (timestamp: {remote_delete.get('timestamp')})")
+                    continue
+                
+                account = envelope.get('account', '')
+                
+                # Extract source and sourceUuid - Signal peut mettre l'UUID dans 'source' parfois
+                source = envelope.get('source') or envelope.get('sourceNumber')
+                source_uuid = envelope.get('sourceUuid')
+                
+                # Détecter si 'source' est un UUID ou un numéro de téléphone
+                # UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (avec ou sans tirets)
+                uuid_pattern = re.compile(r'^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$', re.IGNORECASE)
+                
+                if source and uuid_pattern.match(source):
+                    # 'source' est un UUID, pas un numéro
+                    sender_uuid = source
+                    sender_number = None  # Pas de numéro disponible
+                else:
+                    # 'source' est un numéro de téléphone
+                    sender_number = source
+                    sender_uuid = source_uuid  # Utiliser sourceUuid si disponible
+                
+                sender_name = envelope.get('sourceName')
+                
+                sender = Contact(
+                    number=sender_number or '',  # Utiliser string vide si pas de numéro
+                    name=sender_name,
+                    uuid=sender_uuid
+                )
+                
+                timestamp_ms = envelope.get('timestamp', 0)
+                timestamp = datetime.fromtimestamp(timestamp_ms / 1000)
+                
+                text = data_message.get('message')
+
+                attachments = []
+                for att_data in data_message.get('attachments', []):
+                    attachment = Attachment(
+                        content_type=att_data.get('contentType', ''),
+                        id=att_data.get('id', ''),
+                        filename=att_data.get('filename', ''),
+                        size=att_data.get('size', 0),
+                        upload_timestamp_ms=att_data.get('uploadTimestamp', 0)
+                    )
+                    attachments.append(attachment)  
+
+                group = None
+                is_group = False
+                group_info = data_message.get('groupInfo')
+
+                if group_info:
+                    is_group = True
+                    group = Group(
+                        id=group_info.get('groupId', ''),
+                        name=group_info.get('name', 'Unknown')
+                    )
+
+                output.append(Message(
+                    sender=sender,
+                    timestamp=timestamp,
+                    text=text,
+                    attachments=attachments,
+                    group=group,
+                    is_group_message=is_group,
+                    account=account
+                ))
+
+            return output
     
+
     def send_message(
             self,
             recipient: str,
@@ -482,7 +512,7 @@ class SignalClient:
             # Unix-like : ~/.local/share/signal-cli/attachments
             return Path.home() / ".local" / "share" / "signal-cli" / "attachments" 
     
-    def download_attachment(self, phone_number: str,  group_id: str, attachment_id: str) -> str:
+    def download_attachment(self, phone_number: str,   messages: list[Message]) -> str:
         """
         Télécharge une pièce jointe
         
@@ -490,10 +520,25 @@ class SignalClient:
             attachment_id: ID de la pièce jointe à télécharger
             output_path: Chemin de destination
         """
-        args = ["-a", phone_number, "getAttachment", "--id", attachment_id, "--group", group_id]
-        self._run_command(args)
 
-        return self._get_signal_cli_attachments_dir() / attachment_id
+        messages_with_attachments_paths = []
+        for message in messages:
+
+            attachments_output = []
+
+            for attachment in message.attachments:
+                args = ["-a", phone_number, "getAttachment", "--id", attachment.id, "--group", message.group.id]
+                self._run_command(args)
+                output_path = self._get_signal_cli_attachments_dir() / attachment.id
+                attachment.path = output_path
+                attachments_output.append(attachment)
+
+            message.attachments = attachments_output
+            messages_with_attachments_paths.append(message)
+
+
+        return messages_with_attachments_paths
+            
 
     def daemon_start(self) -> subprocess.Popen:
         """
