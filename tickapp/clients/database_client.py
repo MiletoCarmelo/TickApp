@@ -1,5 +1,6 @@
 # tickapp/clients/database_client.py
 import psycopg2
+import time
 from typing import List, Optional
 from ..models import ReceiptData
 from ..clients.signal_client import Message
@@ -16,8 +17,34 @@ class DatabaseClient:
             "port": port,
             "database": database,
             "user": user,
-            "password": password
+            "password": password,
+            "connect_timeout": 10  # Timeout de connexion de 10 secondes
         }
+    
+    def _get_connection(self, max_retries: int = 3, retry_delay: float = 1.0):
+        """
+        Obtient une connexion à la base de données avec retry
+        
+        Args:
+            max_retries: Nombre maximum de tentatives
+            retry_delay: Délai entre les tentatives (secondes)
+        
+        Returns:
+            Connection object
+        """
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                conn = psycopg2.connect(**self.conn_params)
+                return conn
+            except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))  # Backoff exponentiel
+                    continue
+                else:
+                    raise
+        raise last_error
     
     def insert_signal_message(self, message: Message) -> tuple[int, List[int]]:
         """
@@ -29,7 +56,7 @@ class DatabaseClient:
         Returns:
             (message_id, [attachment_ids])
         """
-        conn = psycopg2.connect(**self.conn_params)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         try:
@@ -132,7 +159,7 @@ class DatabaseClient:
         Returns:
             transaction_id
         """
-        conn = psycopg2.connect(**self.conn_params)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         try:

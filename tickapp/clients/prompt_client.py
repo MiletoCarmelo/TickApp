@@ -3,6 +3,7 @@
 Client pour générer des prompts dynamiques à partir de la base de données
 """
 import psycopg2
+import time
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -32,8 +33,34 @@ class PromptClient:
             "port": port,
             "database": database,
             "user": user,
-            "password": password
+            "password": password,
+            "connect_timeout": 10  # Timeout de connexion de 10 secondes
         }
+    
+    def _get_connection(self, max_retries: int = 3, retry_delay: float = 1.0):
+        """
+        Obtient une connexion à la base de données avec retry
+        
+        Args:
+            max_retries: Nombre maximum de tentatives
+            retry_delay: Délai entre les tentatives (secondes)
+        
+        Returns:
+            Connection object
+        """
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                conn = psycopg2.connect(**self.conn_params)
+                return conn
+            except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))  # Backoff exponentiel
+                    continue
+                else:
+                    raise
+        raise last_error
     
     def _get_item_categories(self) -> str:
         """
@@ -42,7 +69,7 @@ class PromptClient:
         Returns:
             String formatée avec toutes les catégories d'items
         """
-        conn = psycopg2.connect(**self.conn_params)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         try:
@@ -91,7 +118,7 @@ class PromptClient:
         Returns:
             String formatée avec toutes les catégories de transaction (ID et nom)
         """
-        conn = psycopg2.connect(**self.conn_params)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         try:
@@ -151,7 +178,7 @@ class PromptClient:
         Returns:
             Liste de tuples (category_main, category_sub)
         """
-        conn = psycopg2.connect(**self.conn_params)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         try:

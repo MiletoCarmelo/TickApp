@@ -72,6 +72,7 @@ class Contact:
 
 
 @dataclass
+@dataclass
 class Group:
     """Représente un groupe Signal"""
     id: str
@@ -484,12 +485,7 @@ class SignalClient:
                 else:
                     name = "Unknown"
                 
-                current_group = Group(
-                    id=group_id,
-                    name=name,
-                    members=[],
-                    admins=[]
-                )
+                current_group = Group(id=group_id, name=name)
         
         if current_group:
             groups.append(current_group)

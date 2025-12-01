@@ -43,12 +43,12 @@ def is_within_schedule() -> bool:
     return 8 <= hour < 18
 
 
-def get_new_messages(context: SensorEvaluationContext) -> List[Message]:
+def get_new_messages(context: SensorEvaluationContext) -> List[tuple]:
     """
     Récupère les nouveaux messages Signal non encore traités
     
     Returns:
-        Liste des nouveaux messages avec attachments
+        Liste de tuples (Message, JSON brut) pour chaque nouveau message
     """
     phone_number = os.getenv("SIGNAL_PHONE_NUMBER")
     if not phone_number:
@@ -62,13 +62,31 @@ def get_new_messages(context: SensorEvaluationContext) -> List[Message]:
     if not raw_messages:
         return []
     
-    # Parser les messages
-    messages = client._parse_message(raw_messages)
+    # Parser les messages ET garder le JSON brut pour chaque message
+    # On parse ligne par ligne pour faire correspondre Message -> JSON brut
+    import json
+    raw_json_lines = [line.strip() for line in raw_messages.strip().split('\n') if line.strip()]
+    parsed_messages = client._parse_message(raw_messages)
+    
+    # Créer un mapping (timestamp_ms, sender_uuid) -> JSON brut
+    # Note: On utilise le timestamp + sender_uuid comme clé car Message n'est pas hashable
+    message_json_map = {}
+    for line in raw_json_lines:
+        try:
+            msg_json = json.loads(line)
+            envelope = msg_json.get('envelope', {})
+            timestamp_ms = envelope.get('timestamp', 0)
+            source_uuid = envelope.get('sourceUuid') or envelope.get('source')
+            # Utiliser (timestamp_ms, sender_uuid) comme clé
+            key = (timestamp_ms, str(source_uuid) if source_uuid else None)
+            message_json_map[key] = msg_json
+        except (json.JSONDecodeError, KeyError):
+            continue
     
     # Télécharger les attachments
     messages_with_attachments = client.download_attachment(
         phone_number=client.phone_number,
-        messages=messages
+        messages=parsed_messages
     )
     
     # Filtrer les messages avec attachments (images de tickets)
@@ -89,18 +107,38 @@ def get_new_messages(context: SensorEvaluationContext) -> List[Message]:
         password=os.getenv("DB_PASSWORD", "SuperSecretPassword123!")
     )
     
+    # Helper function pour connexion avec retry
+    def get_db_connection(max_retries=3, retry_delay=1.0):
+        import psycopg2
+        import time
+        last_error = None
+        conn_params = {
+            "host": os.getenv("DB_HOST", "localhost"),
+            "port": int(os.getenv("DB_PORT", "5434")),
+            "database": os.getenv("DB_NAME", "receipt_processing"),
+            "user": os.getenv("DB_USER", "receipt_user"),
+            "password": os.getenv("DB_PASSWORD", "SuperSecretPassword123!"),
+            "connect_timeout": 10
+        }
+        for attempt in range(max_retries):
+            try:
+                return psycopg2.connect(**conn_params)
+            except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))
+                    continue
+                else:
+                    raise
+        raise last_error
+    
+    # Retourner une liste de tuples (Message, JSON brut)
     new_messages = []
     for message in messages_with_images:
         # Vérifier si le message existe déjà en base
         try:
             import psycopg2
-            conn = psycopg2.connect(
-                host=os.getenv("DB_HOST", "localhost"),
-                port=int(os.getenv("DB_PORT", "5434")),
-                database=os.getenv("DB_NAME", "receipt_processing"),
-                user=os.getenv("DB_USER", "receipt_user"),
-                password=os.getenv("DB_PASSWORD", "SuperSecretPassword123!")
-            )
+            conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT COUNT(*) 
@@ -114,11 +152,20 @@ def get_new_messages(context: SensorEvaluationContext) -> List[Message]:
             conn.close()
             
             if count == 0:
-                new_messages.append(message)
+                # Récupérer le JSON brut correspondant en utilisant la clé (timestamp_ms, sender_uuid)
+                timestamp_ms = int(message.timestamp.timestamp() * 1000)
+                sender_uuid = str(message.sender.uuid) if message.sender.uuid else None
+                key = (timestamp_ms, sender_uuid)
+                message_json = message_json_map.get(key, {})
+                new_messages.append((message, message_json))
         except Exception as e:
             context.log.warning(f"Erreur lors de la vérification du message: {e}")
             # En cas d'erreur, considérer comme nouveau pour éviter de perdre des messages
-            new_messages.append(message)
+            timestamp_ms = int(message.timestamp.timestamp() * 1000)
+            sender_uuid = str(message.sender.uuid) if message.sender.uuid else None
+            key = (timestamp_ms, sender_uuid)
+            message_json = message_json_map.get(key, {})
+            new_messages.append((message, message_json))
     
     return new_messages
 
@@ -157,8 +204,9 @@ def signal_message_sensor(context: SensorEvaluationContext):
     context.log.info(f"📨 {len(new_messages)} nouveau(x) message(s) détecté(s)")
     
     # Créer un RunRequest pour chaque nouveau message
+    import json
     run_requests = []
-    for message in new_messages:
+    for message, message_json in new_messages:
         # Créer un identifiant unique pour ce message (basé sur timestamp + sender)
         message_id = f"{message.timestamp.isoformat()}_{message.sender.uuid or message.sender.number or 'unknown'}"
         
@@ -168,6 +216,18 @@ def signal_message_sensor(context: SensorEvaluationContext):
         if message.group:
             group_id = message.group.id
             group_name = message.group.name
+        
+        # Sérialiser les chemins des attachments (le message a déjà été téléchargé par le sensor)
+        attachment_paths = []
+        if message.attachments:
+            for att in message.attachments:
+                if att.path:
+                    attachment_paths.append({
+                        "path": str(att.path),
+                        "content_type": att.content_type,
+                        "filename": att.filename,
+                        "id": att.id
+                    })
         
         run_requests.append(
             RunRequest(
@@ -185,13 +245,19 @@ def signal_message_sensor(context: SensorEvaluationContext):
                 },
                 job_name="process_signal_message",
                 tags={
+                    # Tags essentiels pour retrouver le message
                     "message_timestamp": message.timestamp.isoformat(),
-                    "sender": message.sender.name or message.sender.number or "unknown",
                     "sender_uuid": str(message.sender.uuid) if message.sender.uuid else "",
                     "sender_number": message.sender.number or "",
-                    "has_attachments": str(len(message.attachments)),
+                    "sender_name": message.sender.name or "",
+                    # Tags pour les notifications
                     "group_id": group_id or "",
                     "group_name": group_name or "",
+                    # Tags pour les attachments
+                    "attachment_paths": json.dumps(attachment_paths),
+                    # Tags optionnels pour les logs
+                    "message_text": message.text or "",
+                    "is_group_message": str(message.is_group_message),
                 }
             )
         )
@@ -226,8 +292,9 @@ def signal_message_sensor_test(context: SensorEvaluationContext):
     context.log.info(f"🧪 [TEST] {len(new_messages)} nouveau(x) message(s) détecté(s)")
     
     # Créer un RunRequest pour chaque nouveau message
+    import json
     run_requests = []
-    for message in new_messages:
+    for message, message_json in new_messages:
         # Créer un identifiant unique pour ce message (basé sur timestamp + sender)
         message_id = f"{message.timestamp.isoformat()}_{message.sender.uuid or message.sender.number or 'unknown'}"
         
@@ -237,6 +304,18 @@ def signal_message_sensor_test(context: SensorEvaluationContext):
         if message.group:
             group_id = message.group.id
             group_name = message.group.name
+        
+        # Sérialiser les chemins des attachments (le message a déjà été téléchargé par le sensor)
+        attachment_paths = []
+        if message.attachments:
+            for att in message.attachments:
+                if att.path:
+                    attachment_paths.append({
+                        "path": str(att.path),
+                        "content_type": att.content_type,
+                        "filename": att.filename,
+                        "id": att.id
+                    })
         
         run_requests.append(
             RunRequest(
@@ -254,13 +333,19 @@ def signal_message_sensor_test(context: SensorEvaluationContext):
                 },
                 job_name="process_signal_message",
                 tags={
+                    # Tags essentiels pour retrouver le message
                     "message_timestamp": message.timestamp.isoformat(),
-                    "sender": message.sender.name or message.sender.number or "unknown",
                     "sender_uuid": str(message.sender.uuid) if message.sender.uuid else "",
                     "sender_number": message.sender.number or "",
-                    "has_attachments": str(len(message.attachments)),
+                    "sender_name": message.sender.name or "",
+                    # Tags pour les notifications
                     "group_id": group_id or "",
                     "group_name": group_name or "",
+                    # Tags pour les attachments
+                    "attachment_paths": json.dumps(attachment_paths),
+                    # Tags optionnels pour les logs
+                    "message_text": message.text or "",
+                    "is_group_message": str(message.is_group_message),
                     "test_mode": "true",  # Tag pour identifier les runs de test
                 }
             )

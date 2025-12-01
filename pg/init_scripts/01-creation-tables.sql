@@ -3,6 +3,7 @@
 -- ============================================================================
 
 -- Suppression des tables existantes si nécessaire
+DROP TABLE IF EXISTS transaction_attachment_mapping CASCADE;
 DROP TABLE IF EXISTS transaction_item_mapping CASCADE;
 DROP TABLE IF EXISTS item CASCADE;
 DROP TABLE IF EXISTS transaction CASCADE;
@@ -148,6 +149,15 @@ CREATE TABLE transaction_item_mapping (
     FOREIGN KEY (item_id) REFERENCES item(item_id) ON DELETE CASCADE
 );
 
+-- TABLE 9c: TRANSACTION_ATTACHMENT_MAPPING (mapping transaction -> attachment)
+CREATE TABLE transaction_attachment_mapping (
+    transaction_id INTEGER NOT NULL,
+    attachment_id INTEGER NOT NULL,
+    PRIMARY KEY (transaction_id, attachment_id),
+    FOREIGN KEY (transaction_id) REFERENCES transaction(transaction_id) ON DELETE CASCADE,
+    FOREIGN KEY (attachment_id) REFERENCES attachment(attachment_id) ON DELETE CASCADE
+);
+
 -- ============================================================================
 -- CRÉATION DES INDEX
 -- ============================================================================
@@ -194,6 +204,10 @@ CREATE INDEX idx_transaction_source ON transaction(source);
 -- Transaction Item Mapping
 CREATE INDEX idx_trans_item_mapping_transaction ON transaction_item_mapping(transaction_id);
 CREATE INDEX idx_trans_item_mapping_item ON transaction_item_mapping(item_id);
+
+-- Transaction Attachment Mapping
+CREATE INDEX idx_trans_att_mapping_transaction ON transaction_attachment_mapping(transaction_id);
+CREATE INDEX idx_trans_att_mapping_attachment ON transaction_attachment_mapping(attachment_id);
 
 -- Item
 CREATE INDEX idx_item_category ON item(category_id);

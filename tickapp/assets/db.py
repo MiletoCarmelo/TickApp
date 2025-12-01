@@ -54,18 +54,37 @@ def receipts_in_db(
             if message_id:
                 attachment_ids = attachment_ids_map.get(message_id, None)
             
+            # Helper function pour connexion avec retry
+            def get_db_connection(max_retries=3, retry_delay=1.0):
+                import psycopg2
+                import time
+                last_error = None
+                conn_params = {
+                    "host": os.getenv("DB_HOST", "localhost"),
+                    "port": int(os.getenv("DB_PORT", "5434")),
+                    "database": os.getenv("DB_NAME", "receipt_processing"),
+                    "user": os.getenv("DB_USER", "receipt_user"),
+                    "password": os.getenv("DB_PASSWORD", "SuperSecretPassword123!"),
+                    "connect_timeout": 10
+                }
+                for attempt in range(max_retries):
+                    try:
+                        return psycopg2.connect(**conn_params)
+                    except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+                        last_error = e
+                        if attempt < max_retries - 1:
+                            time.sleep(retry_delay * (attempt + 1))
+                            continue
+                        else:
+                            raise
+                raise last_error
+            
             # Si pas de message_id mais qu'on a un message, essayer de le récupérer depuis la base
             # en cherchant par timestamp et sender
             if not message_id and message:
                 try:
                     import psycopg2
-                    conn = psycopg2.connect(
-                        host=os.getenv("DB_HOST", "localhost"),
-                        port=int(os.getenv("DB_PORT", "5434")),
-                        database=os.getenv("DB_NAME", "receipt_processing"),
-                        user=os.getenv("DB_USER", "receipt_user"),
-                        password=os.getenv("DB_PASSWORD", "SuperSecretPassword123!")
-                    )
+                    conn = get_db_connection()
                     cursor = conn.cursor()
                     cursor.execute("""
                         SELECT m.message_id 

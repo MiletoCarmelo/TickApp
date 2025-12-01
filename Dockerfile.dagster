@@ -1,0 +1,42 @@
+# Dockerfile pour Dagster
+FROM python:3.11-slim
+
+# Installer les dépendances système (Java pour signal-cli)
+RUN apt-get update && apt-get install -y \
+    openjdk-17-jre-headless \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Installer signal-cli
+RUN wget https://github.com/AsamK/signal-cli/releases/download/v0.13.1/signal-cli-0.13.1-Linux.tar.gz && \
+    tar xf signal-cli-0.13.1-Linux.tar.gz -C /opt && \
+    ln -sf /opt/signal-cli-0.13.1/bin/signal-cli /usr/local/bin/signal-cli && \
+    rm signal-cli-0.13.1-Linux.tar.gz && \
+    chmod +x /usr/local/bin/signal-cli
+
+# Installer Poetry
+RUN pip install poetry
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Copier les fichiers de configuration
+COPY pyproject.toml poetry.lock ./
+
+# Installer les dépendances
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi
+
+# Copier le code de l'application
+COPY . .
+
+# Créer le dossier pour signal-cli data
+RUN mkdir -p /root/.local/share/signal-cli
+
+# Exposer le port pour dagster-webserver
+EXPOSE 3000
+
+# Commande par défaut (sera surchargée dans docker-compose)
+CMD ["dagster", "dev"]
+

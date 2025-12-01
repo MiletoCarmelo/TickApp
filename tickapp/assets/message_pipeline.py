@@ -3,14 +3,16 @@
 Assets Dagster pour traiter un seul message Signal (pipeline par message)
 Utilise la nouvelle API @asset au lieu de @op
 """
-from dagster import asset, AssetExecutionContext, Config, HookContext, failure_hook, success_hook, define_asset_job
+from dagster import asset, AssetExecutionContext, Config, define_asset_job, RunStatusSensorContext, DagsterRunStatus, run_status_sensor
 from typing import Optional, Dict
 from datetime import datetime
 import os
 from dotenv import load_dotenv
 from pydantic import Field
 
-from tickapp.clients.signal_client import SignalClient, Message
+from tickapp.clients.signal_client import SignalClient, Message, Attachment, Contact, Group
+from pathlib import Path
+import json
 from tickapp.clients.database_client import DatabaseClient
 from tickapp.clients.claude_client import ClaudeClient
 from tickapp.clients.prompt_client import PromptClient
@@ -20,18 +22,13 @@ from tickapp.models import ReceiptData
 load_dotenv()
 
 
-def send_signal_notification(
-    context: HookContext,
+def send_signal_notification_from_run_context(
+    context: RunStatusSensorContext,
     text: str = "",
     is_error: bool = False
 ) -> None:
     """
-    Envoie une notification Signal
-    
-    Args:
-        context: Contexte du hook Dagster
-        text: Texte à envoyer
-        is_error: Si True, préfixe avec ❌, sinon ✅
+    Envoie une notification Signal depuis un RunStatusSensorContext
     """
     try:
         phone_number = os.getenv("SIGNAL_PHONE_NUMBER")
@@ -41,98 +38,63 @@ def send_signal_notification(
         
         client = SignalClient(phone_number=phone_number)
         
-        # Récupérer les infos depuis les run tags
+        # Récupérer les tags du run
         tags = {}
-        if hasattr(context, 'run') and context.run:
-            tags = context.run.tags
-        elif hasattr(context, 'dagster_run') and context.dagster_run:
-            tags = context.dagster_run.tags
+        if hasattr(context, 'dagster_run') and context.dagster_run:
+            tags = getattr(context.dagster_run, 'tags', {})
         
-        message_timestamp = tags.get("message_timestamp", "N/A")
-        sender = tags.get("sender", "unknown")
-        group_id = tags.get("group_id", "")
+        # Récupérer les infos du sender depuis les tags
+        sender_name = tags.get("sender_name", "").strip()
+        sender_number = tags.get("sender_number", "").strip()
+        sender_uuid = tags.get("sender_uuid", "").strip()
+        group_id = tags.get("group_id", "") or ""
         group_name = tags.get("group_name", "")
         
-        # Construire le message
+        # Construire la mention de l'utilisateur
+        mention = None
+        if sender_name and sender_name.strip() and sender_name.lower() not in ["unknown", "none", ""]:
+            mention_name = sender_name.split()[0] if " " in sender_name else sender_name
+            mention = f"@{mention_name}"
+        elif sender_number and sender_number.strip():
+            mention = f"@{sender_number[-4:]}" if len(sender_number) >= 4 else f"@{sender_number}"
+        elif sender_uuid and sender_uuid.strip():
+            mention = f"@{sender_uuid[:8]}"
+        
+        if not mention:
+            mention = "@utilisateur"
+        
+        # Construire le message avec mention
         emoji = "❌" if is_error else "✅"
-        full_text = f"{emoji} {text}\n\n📅 {message_timestamp}\n👤 {sender}"
+        full_text = f"{mention} {emoji} {text}"
         
-        # Priorité 1: Utiliser le group_id depuis les tags (le plus fiable)
-        if group_id:
-            client.send_to_group(group_id=group_id, text=full_text)
-            context.log.info(f"✅ Notification Signal envoyée au groupe {group_name or group_id}")
-            return
+        # Envoyer au groupe
+        if group_id and group_id.strip():
+            try:
+                client.send_to_group(group_id=group_id, text=full_text)
+                context.log.info(f"✅ Notification Signal envoyée au groupe {group_name or group_id}")
+                return
+            except Exception as e:
+                context.log.warning(f"⚠️  Erreur lors de l'envoi au groupe {group_id}: {e}")
         
-        # Priorité 2: Essayer d'envoyer au groupe par défaut si configuré (via group_id dans env)
-        # Note: find_group_by_name n'existe pas, donc on ne peut pas chercher par nom
-        # Si besoin, passer directement group_id via variable d'environnement
+        # Fallback: utiliser le group_id depuis l'env
+        env_group_id = os.getenv("SIGNAL_GROUP_ID")
+        if env_group_id and env_group_id.strip():
+            try:
+                client.send_to_group(group_id=env_group_id, text=full_text)
+                context.log.info(f"✅ Notification Signal envoyée au groupe par défaut (env): {env_group_id}")
+                return
+            except Exception as e:
+                context.log.warning(f"⚠️  Erreur lors de l'envoi au groupe par défaut {env_group_id}: {e}")
         
-        # Si aucun groupe trouvé, log un avertissement
         context.log.warning("⚠️  Aucun groupe Signal trouvé pour envoyer la notification")
             
     except Exception as e:
-        # Ne pas faire échouer le pipeline si l'envoi de notification échoue
         context.log.warning(f"⚠️  Erreur lors de l'envoi de notification Signal: {e}")
 
 
-@failure_hook(required_resource_keys=set())
-def notify_signal_failure(context: HookContext):
-    """
-    Hook appelé en cas d'échec d'un asset
-    """
-    # Récupérer l'asset qui a échoué
-    failed_asset = "unknown"
-    if hasattr(context, 'step') and context.step:
-        failed_asset = context.step.asset_key.to_user_string() if hasattr(context.step, 'asset_key') else "unknown"
-    elif hasattr(context, 'asset_key'):
-        failed_asset = context.asset_key.to_user_string()
-    
-    # Récupérer l'erreur
-    error = "Unknown error"
-    if hasattr(context, 'failure_exception') and context.failure_exception:
-        error = str(context.failure_exception)
-    elif hasattr(context, 'step_exception') and context.step_exception:
-        error = str(context.step_exception)
-    
-    # Limiter la taille de l'erreur pour le message
-    if len(error) > 200:
-        error = error[:200] + "..."
-    
-    message = f"Échec du traitement du ticket\n\n🔧 Asset: {failed_asset}\n❌ Erreur: {error}"
-    
-    send_signal_notification(
-        context=context,
-        text=message,
-        is_error=True
-    )
-
-
-@success_hook(required_resource_keys=set())
-def notify_signal_success(context: HookContext):
-    """
-    Hook appelé en cas de succès du job complet
-    """
-    # Récupérer les infos depuis les métadonnées du run
-    tags = {}
-    
-    if hasattr(context, 'run') and context.run:
-        tags = context.run.tags
-    elif hasattr(context, 'dagster_run') and context.dagster_run:
-        tags = context.dagster_run.tags
-    
-    # Construire le message de succès
-    message = (
-        f"Ticket traité avec succès ! 🎉\n\n"
-        f"✅ Pipeline terminé\n"
-        f"📎 {tags.get('has_attachments', '0')} attachment(s) traité(s)"
-    )
-    
-    send_signal_notification(
-        context=context,
-        text=message,
-        is_error=False
-    )
-
+# ============================================================================
+# ASSETS
+# ============================================================================
 
 class MessageConfig(Config):
     """Configuration pour un message Signal"""
@@ -141,9 +103,7 @@ class MessageConfig(Config):
     sender_number: Optional[str] = Field(default=None, description="Numéro de téléphone du sender")
 
 
-@asset(
-    hooks={notify_signal_failure}
-)
+@asset
 def message_from_signal(context: AssetExecutionContext) -> Message:
     """
     Asset pour récupérer un message Signal spécifique depuis Signal
@@ -185,96 +145,80 @@ def message_from_signal(context: AssetExecutionContext) -> Message:
             "Assurez-vous que le sensor passe 'message_timestamp' dans les tags."
         )
     
-    context.log.info(f"📱 Récupération du message Signal du {message_timestamp}...")
+    # Reconstruire le message depuis les tags (méthode simplifiée)
+    context.log.info(f"📱 Reconstruction du message Signal depuis les tags (timestamp: {message_timestamp})...")
     
-    phone_number = os.getenv("SIGNAL_PHONE_NUMBER")
-    if not phone_number:
-        raise ValueError("SIGNAL_PHONE_NUMBER non défini")
-    
-    client = SignalClient(phone_number=phone_number)
-    
-    # Recevoir les messages récents (augmenter pour trouver le message même s'il est plus ancien)
-    raw_messages = client.receive(number_of_messages=100)
-    messages = client._parse_message(raw_messages)
-    
-    # Trouver le message correspondant
+    # Parser le timestamp
     try:
-        # Essayer de parser le timestamp avec timezone
         if 'Z' in message_timestamp or '+' in message_timestamp:
             target_timestamp = datetime.fromisoformat(message_timestamp.replace('Z', '+00:00'))
         else:
             target_timestamp = datetime.fromisoformat(message_timestamp)
     except ValueError as e:
-        # Si échec, essayer sans timezone
         try:
             target_timestamp = datetime.fromisoformat(message_timestamp.replace('Z', ''))
         except ValueError:
             raise ValueError(
                 f"Impossible de parser le timestamp '{message_timestamp}': {e}. "
-                f"Format attendu: ISO 8601 (ex: '2024-01-01T12:00:00' ou '2024-01-01T12:00:00Z')"
+                f"Format attendu: ISO 8601"
             )
     
     # Normaliser pour comparaison (enlever timezone si présent)
     if target_timestamp.tzinfo:
         target_timestamp = target_timestamp.replace(tzinfo=None)
     
-    message = None
-    best_match = None
-    best_score = float('inf')
+    # Reconstruire les attachments depuis les tags
+    attachment_paths_json = tags.get("attachment_paths", "[]")
+    try:
+        attachment_paths = json.loads(attachment_paths_json)
+    except json.JSONDecodeError:
+        attachment_paths = []
     
-    for msg in messages:
-        # Comparer les timestamps (avec une tolérance plus large)
-        # Le message peut avoir été reçu quelques secondes/minutes avant le traitement
-        time_diff = abs((msg.timestamp - target_timestamp).total_seconds())
-        
-        if time_diff < 300:  # Tolérance de 5 minutes (300 secondes)
-            score = time_diff
-            
-            # Bonus si le sender correspond
-            sender_match = False
-            if sender_uuid and msg.sender.uuid:
-                if str(msg.sender.uuid) == sender_uuid:
-                    sender_match = True
-                    score -= 5  # Bonus pour match sender
-            elif sender_number and msg.sender.number:
-                if msg.sender.number == sender_number:
-                    sender_match = True
-                    score -= 5  # Bonus pour match sender
-            
-            if score < best_score:
-                best_score = score
-                best_match = msg
+    attachments = []
+    for att_data in attachment_paths:
+        if Path(att_data.get("path", "")).exists():
+            attachments.append(Attachment(
+                id=att_data.get("id", ""),
+                content_type=att_data.get("content_type", ""),
+                filename=att_data.get("filename", ""),
+                size=0,
+                upload_timestamp_ms=0,
+                path=Path(att_data.get("path", ""))
+            ))
     
-    message = best_match
+    if not attachments:
+        raise ValueError("Aucun attachment trouvé dans les tags. Le message doit avoir des images.")
     
-    if not message:
-        # Afficher quelques informations de debug
-        context.log.warning(
-            f"⚠️  Message non trouvé. Timestamp recherché: {target_timestamp}, "
-            f"Nombre de messages vérifiés: {len(messages)}"
-        )
-        if messages:
-            # Afficher les timestamps des messages récents pour debug
-            recent_timestamps = [msg.timestamp.isoformat() for msg in messages[:5]]
-            context.log.warning(f"   Timestamps des 5 premiers messages: {recent_timestamps}")
-        
-        raise ValueError(
-            f"Message non trouvé pour timestamp {message_timestamp} "
-            f"(sender_uuid={sender_uuid}, sender_number={sender_number}). "
-            f"Le message est peut-être trop ancien ou déjà traité. "
-            f"Vérifié {len(messages)} message(s) récent(s)."
-        )
-    
-    # Télécharger les attachments
-    messages_with_attachments = client.download_attachment(
-        phone_number=client.phone_number,
-        messages=[message]
+    # Reconstruire le contact
+    sender_name = tags.get("sender_name", "")
+    contact = Contact(
+        number=sender_number or "",
+        name=sender_name if sender_name else None,
+        uuid=sender_uuid if sender_uuid else None
     )
     
-    if not messages_with_attachments:
-        raise ValueError("Aucun message avec attachments trouvé")
+    # Reconstruire le groupe si disponible
+    group = None
+    group_id = tags.get("group_id", "")
+    group_name = tags.get("group_name", "")
+    if group_id:
+        group = Group(id=group_id, name=group_name)
     
-    message = messages_with_attachments[0]
+    # Reconstruire le message
+    message_text = tags.get("message_text", "")
+    is_group_message = tags.get("is_group_message", "False").lower() == "true"
+    
+    message = Message(
+        sender=contact,
+        timestamp=target_timestamp,
+        text=message_text if message_text else None,
+        attachments=attachments,
+        group=group,
+        is_group_message=is_group_message,
+        account=None
+    )
+    
+    context.log.info(f"✅ Message reconstruit depuis tags avec {len(attachments)} attachment(s)")
     
     # Vérifier qu'il y a des images
     has_images = any(
@@ -290,8 +234,7 @@ def message_from_signal(context: AssetExecutionContext) -> Message:
 
 
 @asset(
-    deps=[message_from_signal],
-    hooks={notify_signal_failure}
+    deps=[message_from_signal]
 )
 def message_in_db(context: AssetExecutionContext, message_from_signal: Message) -> Dict:
     """
@@ -326,8 +269,7 @@ def message_in_db(context: AssetExecutionContext, message_from_signal: Message) 
 
 
 @asset(
-    deps=[message_from_signal],
-    hooks={notify_signal_failure}
+    deps=[message_from_signal]
 )
 def claude_extraction(context: AssetExecutionContext, message_from_signal: Message) -> Dict:
     """
@@ -375,8 +317,7 @@ def claude_extraction(context: AssetExecutionContext, message_from_signal: Messa
 
 
 @asset(
-    deps=[claude_extraction, message_in_db],
-    hooks={notify_signal_failure}
+    deps=[claude_extraction, message_in_db]
 )
 def transformed_receipt(
     context: AssetExecutionContext,
@@ -412,8 +353,7 @@ def transformed_receipt(
 
 
 @asset(
-    deps=[transformed_receipt, message_in_db],
-    hooks={notify_signal_failure, notify_signal_success}
+    deps=[transformed_receipt, message_in_db]
 )
 def receipt_in_db(
     context: AssetExecutionContext,
@@ -470,6 +410,57 @@ process_signal_message = define_asset_job(
         claude_extraction,
         transformed_receipt,
         receipt_in_db
-    ],
-    hooks={notify_signal_failure, notify_signal_success}
+    ]
 )
+
+
+# Sensors pour les notifications (une seule notification à la fin du run)
+# Note: Les run_status_sensor sont la méthode recommandée par Dagster pour 
+# envoyer des notifications à la fin d'un run (pas de hooks de run intégrés)
+@run_status_sensor(
+    run_status=DagsterRunStatus.SUCCESS,
+    monitored_jobs=[process_signal_message]
+)
+def notify_signal_success_sensor(context: RunStatusSensorContext):
+    """
+    Sensor qui envoie une notification en cas de succès du job (une seule fois à la fin)
+    Se déclenche automatiquement quand le run se termine avec SUCCESS
+    """
+    message = "Ticket traité avec succès ! 🎉"
+    send_signal_notification_from_run_context(
+        context=context,
+        text=message,
+        is_error=False
+    )
+
+
+@run_status_sensor(
+    run_status=DagsterRunStatus.FAILURE,
+    monitored_jobs=[process_signal_message]
+)
+def notify_signal_failure_sensor(context: RunStatusSensorContext):
+    """
+    Sensor qui envoie une notification en cas d'échec du job (une seule fois à la fin)
+    Se déclenche automatiquement quand le run se termine avec FAILURE
+    """
+    # Récupérer l'erreur depuis le run
+    error = "Unknown error"
+    if hasattr(context, 'dagster_run') and context.dagster_run:
+        # Essayer de récupérer l'erreur depuis les événements du run
+        if hasattr(context.dagster_run, 'failure_reason') and context.dagster_run.failure_reason:
+            error = str(context.dagster_run.failure_reason)
+        elif hasattr(context.dagster_run, 'tags'):
+            # Parfois l'erreur est dans les tags
+            error = context.dagster_run.tags.get('dagster/error', error)
+    
+    # Limiter la taille de l'erreur
+    if len(error) > 200:
+        error = error[:200] + "..."
+    
+    message = f"Échec du traitement du ticket\n\n❌ Erreur: {error}"
+    
+    send_signal_notification_from_run_context(
+        context=context,
+        text=message,
+        is_error=True
+    )
