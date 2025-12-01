@@ -35,6 +35,14 @@ else
     echo "3️⃣  Fichier de vues non trouvé, ignoré."
 fi
 
+# Vérifier si le fichier de données fictives existe avant de l'exécuter
+if [ -f "pg/init_scripts/04-sample-data.sql" ]; then
+    echo "4️⃣  Insertion des données fictives..."
+    docker exec -i receipt-postgres psql -U receipt_user -d receipt_processing < pg/init_scripts/04-sample-data.sql
+else
+    echo "4️⃣  Fichier de données fictives non trouvé, ignoré."
+fi
+
 echo ""
 echo "✅ Base de données réinitialisée !"
 echo ""

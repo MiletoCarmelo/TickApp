@@ -1,19 +1,22 @@
 # Dockerfile pour Dagster
 FROM python:3.11-slim
 
-# Installer les dépendances système (Java pour signal-cli)
+# Installer les dépendances système (Java pour signal-cli et PostgreSQL pour psycopg2)
 RUN apt-get update && apt-get install -y \
-    openjdk-17-jre-headless \
+    openjdk-21-jre-headless \
     wget \
     curl \
+    libpq-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Installer signal-cli
-RUN wget https://github.com/AsamK/signal-cli/releases/download/v0.13.1/signal-cli-0.13.1-Linux.tar.gz && \
-    tar xf signal-cli-0.13.1-Linux.tar.gz -C /opt && \
-    ln -sf /opt/signal-cli-0.13.1/bin/signal-cli /usr/local/bin/signal-cli && \
-    rm signal-cli-0.13.1-Linux.tar.gz && \
-    chmod +x /usr/local/bin/signal-cli
+ARG SIGNAL_CLI_VERSION=0.13.22
+RUN wget https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}-Linux-native.tar.gz && \
+    tar xf signal-cli-${SIGNAL_CLI_VERSION}-Linux-native.tar.gz -C /opt && \
+    find /opt -name "signal-cli" -type f -exec chmod +x {} \; && \
+    find /opt -name "signal-cli" -type f -exec ln -sf {} /usr/local/bin/signal-cli \; && \
+    rm signal-cli-${SIGNAL_CLI_VERSION}-Linux-native.tar.gz
 
 # Installer Poetry
 RUN pip install poetry
@@ -24,9 +27,9 @@ WORKDIR /app
 # Copier les fichiers de configuration
 COPY pyproject.toml poetry.lock ./
 
-# Installer les dépendances
+# Installer les dépendances (sans installer le projet lui-même)
 RUN poetry config virtualenvs.create false && \
-    poetry install --no-interaction --no-ansi
+    poetry install --no-interaction --no-ansi --no-root
 
 # Copier le code de l'application
 COPY . .
