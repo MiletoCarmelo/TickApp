@@ -103,13 +103,13 @@ app.layout = dbc.Container(
                                 html.I(className="fas fa-receipt me-3"),
                                 "TickApp Dashboard"
                             ],
-                            className="text-center mb-2 mt-4",
-                            style={'fontWeight': '700', 'letterSpacing': '-0.025em'}
+                            className="text-center mb-1 mt-2",
+                            style={'fontWeight': '700', 'letterSpacing': '-0.025em', 'fontSize': '2rem'}
                         ),
                         html.P(
                             "Analyse moderne des dépenses par personne, magasin et catégorie",
-                            className="text-center mb-4",
-                            style={'color': '#64748B', 'fontSize': '1.1rem'}
+                            className="text-center mb-3",
+                            style={'color': '#64748B', 'fontSize': '0.95rem'}
                         ),
                     ]
                 )
@@ -174,7 +174,7 @@ app.layout = dbc.Container(
                     ],
                 ),
             ),
-            className="mb-4",
+            className="mb-3",
             style={'borderRadius': '16px', 'border': '1px solid #E2E8F0'}
         ),
         
@@ -196,10 +196,10 @@ app.layout = dbc.Container(
                                 html.H3(
                                     id="total-spent",
                                     className="mb-0",
-                                    style={'color': COLORS['primary'], 'fontWeight': '700'}
+                                    style={'color': COLORS['primary'], 'fontWeight': '700', 'fontSize': '1.5rem'}
                                 ),
                             ],
-                            style={'padding': '1.5rem'}
+                            style={'padding': '1rem'}
                         ),
                         className="h-100",
                         style={'borderRadius': '16px', 'border': '1px solid #E2E8F0', 'borderTop': f'4px solid {COLORS["primary"]}'}
@@ -222,10 +222,10 @@ app.layout = dbc.Container(
                                 html.H3(
                                     id="total-transactions",
                                     className="mb-0",
-                                    style={'color': COLORS['success'], 'fontWeight': '700'}
+                                    style={'color': COLORS['success'], 'fontWeight': '700', 'fontSize': '1.5rem'}
                                 ),
                             ],
-                            style={'padding': '1.5rem'}
+                            style={'padding': '1rem'}
                         ),
                         className="h-100",
                         style={'borderRadius': '16px', 'border': '1px solid #E2E8F0', 'borderTop': f'4px solid {COLORS["success"]}'}
@@ -248,10 +248,10 @@ app.layout = dbc.Container(
                                 html.H3(
                                     id="avg-transaction",
                                     className="mb-0",
-                                    style={'color': COLORS['secondary'], 'fontWeight': '700'}
+                                    style={'color': COLORS['secondary'], 'fontWeight': '700', 'fontSize': '1.5rem'}
                                 ),
                             ],
-                            style={'padding': '1.5rem'}
+                            style={'padding': '1rem'}
                         ),
                         className="h-100",
                         style={'borderRadius': '16px', 'border': '1px solid #E2E8F0', 'borderTop': f'4px solid {COLORS["secondary"]}'}
@@ -274,10 +274,10 @@ app.layout = dbc.Container(
                                 html.H3(
                                     id="total-stores",
                                     className="mb-0",
-                                    style={'color': COLORS['warning'], 'fontWeight': '700'}
+                                    style={'color': COLORS['warning'], 'fontWeight': '700', 'fontSize': '1.5rem'}
                                 ),
                             ],
-                            style={'padding': '1.5rem'}
+                            style={'padding': '1rem'}
                         ),
                         className="h-100",
                         style={'borderRadius': '16px', 'border': '1px solid #E2E8F0', 'borderTop': f'4px solid {COLORS["warning"]}'}
@@ -303,13 +303,13 @@ app.layout = dbc.Container(
                             ),
                             dbc.CardBody(
                                 [dcc.Graph(id="spending-timeline", config={"displayModeBar": False})],
-                                style={'padding': '1.5rem'}
+                                style={'padding': '1rem'}
                             ),
                         ],
                         style={'borderRadius': '16px', 'border': '1px solid #E2E8F0'}
                     ),
                     md=12,
-                    className="mb-4"
+                    className="mb-3"
                 )
             ]
         ),
@@ -329,13 +329,13 @@ app.layout = dbc.Container(
                             ),
                             dbc.CardBody(
                                 [dcc.Graph(id="spending-by-category", config={"displayModeBar": False})],
-                                style={'padding': '1.5rem'}
+                                style={'padding': '1rem'}
                             ),
                         ],
                         style={'borderRadius': '16px', 'border': '1px solid #E2E8F0'}
                     ),
                     md=6,
-                    className="mb-4",
+                    className="mb-3",
                 ),
                 dbc.Col(
                     dbc.Card(
@@ -349,13 +349,13 @@ app.layout = dbc.Container(
                             ),
                             dbc.CardBody(
                                 [dcc.Graph(id="spending-by-store", config={"displayModeBar": False})],
-                                style={'padding': '1.5rem'}
+                                style={'padding': '1rem'}
                             ),
                         ],
                         style={'borderRadius': '16px', 'border': '1px solid #E2E8F0'}
                     ),
                     md=6,
-                    className="mb-4",
+                    className="mb-3",
                 ),
             ]
         ),
@@ -374,13 +374,13 @@ app.layout = dbc.Container(
                         ),
                         dbc.CardBody(
                             [html.Div(id="transactions-table")],
-                            style={'padding': '1.5rem'}
+                            style={'padding': '1rem'}
                         ),
                     ],
                     style={'borderRadius': '16px', 'border': '1px solid #E2E8F0'}
                 ),
                 md=12,
-                className="mb-4"
+                className="mb-2"
             )
         ),
         
@@ -388,7 +388,7 @@ app.layout = dbc.Container(
         dcc.Interval(id="interval-component", interval=60 * 1000, n_intervals=0),
     ],
     fluid=True,
-    style={'maxWidth': '1400px', 'padding': '2rem 1.5rem'}
+    style={'maxWidth': '1400px', 'padding': '1rem 1rem'}
 )
 
 # Callbacks pour les métriques
@@ -457,14 +457,14 @@ def update_timeline(n, start_date, end_date, categories):
             fillcolor=f'rgba(79, 70, 229, 0.1)'
         )
         fig.update_layout(
-            margin=dict(l=20, r=20, t=20, b=20),
+            margin=dict(l=20, r=20, t=10, b=20),
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
             hovermode="x unified",
-            font=dict(family="Inter, sans-serif", size=12, color="#64748B"),
+            font=dict(family="Inter, sans-serif", size=11, color="#64748B"),
             xaxis=dict(gridcolor='rgba(226, 232, 240, 0.5)'),
             yaxis=dict(gridcolor='rgba(226, 232, 240, 0.5)'),
-            height=350
+            height=250
         )
         return fig
     except Exception:
@@ -505,12 +505,12 @@ def update_category_chart(n, start_date, end_date, categories):
             marker=dict(line=dict(color='white', width=2))
         )
         fig.update_layout(
-            margin=dict(l=20, r=20, t=20, b=20),
+            margin=dict(l=10, r=10, t=10, b=10),
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Inter, sans-serif", size=12, color="#64748B"),
+            font=dict(family="Inter, sans-serif", size=11, color="#64748B"),
             showlegend=True,
-            height=350
+            height=250
         )
         return fig
     except Exception:
@@ -553,14 +553,14 @@ def update_store_chart(n, start_date, end_date, categories):
             marker_line_width=0
         )
         fig.update_layout(
-            margin=dict(l=20, r=20, t=20, b=20),
+            margin=dict(l=10, r=10, t=10, b=20),
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
             yaxis={"categoryorder": "total ascending"},
-            font=dict(family="Inter, sans-serif", size=12, color="#64748B"),
+            font=dict(family="Inter, sans-serif", size=11, color="#64748B"),
             xaxis=dict(gridcolor='rgba(226, 232, 240, 0.5)'),
             yaxis_title="",
-            height=350
+            height=250
         )
         return fig
     except Exception:
