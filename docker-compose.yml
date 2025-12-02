@@ -51,37 +51,18 @@ services:
       - DAGSTER_HOME=/app/dagster_home
       - DAGSTER_CURRENT_IMAGE=receipt-dagster-webserver
     ports:
-      - "${DAGSTER_PORT:-3000}:3000"
+      # Le port interne de Dagster est 3000, mais on le mappe sur 3300 côté host
+      - "${DAGSTER_PORT:-3300}:3000"
     volumes:
       - .:/app
       - dagster_home:/app/dagster_home
       - signal_cli_data:/root/.local/share/signal-cli
-    command: ["dagster", "webserver", "-h", "0.0.0.0", "-p", "3000", "-w", "tickapp.assets:defs"]
+    # Avec Dagster 1.12, on utilise `dagster dev` (qui lance web UI + daemon)
+    # Pas besoin de `-w` car le module est déjà défini dans pyproject.toml ([tool.dagster])
+    command: ["dagster", "dev", "-h", "0.0.0.0", "-p", "3000"]
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - receipt-network
-
-  dagster-daemon:
-    build:
-      context: .
-      dockerfile: Dockerfile.dagster
-    container_name: receipt-dagster-daemon
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - DAGSTER_HOME=/app/dagster_home
-      - DAGSTER_CURRENT_IMAGE=receipt-dagster-daemon
-    volumes:
-      - .:/app
-      - dagster_home:/app/dagster_home
-      - signal_cli_data:/root/.local/share/signal-cli
-    command: ["dagster", "daemon", "run", "-w", "tickapp.assets:defs"]
-    depends_on:
-      - postgres
-      - dagster-webserver
     networks:
       - receipt-network
 

@@ -3,7 +3,7 @@
 Assets Dagster pour traiter un seul message Signal (pipeline par message)
 Utilise la nouvelle API @asset au lieu de @op
 """
-from dagster import asset, AssetExecutionContext, Config, define_asset_job, RunStatusSensorContext, DagsterRunStatus, run_status_sensor
+from dagster import asset, AssetExecutionContext, Config, define_asset_job
 from typing import Optional, Dict
 from datetime import datetime
 import os
@@ -20,76 +20,6 @@ from tickapp.transformers.receipt_transformer import ReceiptTransformer
 from tickapp.models import ReceiptData
 
 load_dotenv()
-
-
-def send_signal_notification_from_run_context(
-    context: RunStatusSensorContext,
-    text: str = "",
-    is_error: bool = False
-) -> None:
-    """
-    Envoie une notification Signal depuis un RunStatusSensorContext
-    """
-    try:
-        phone_number = os.getenv("SIGNAL_PHONE_NUMBER")
-        if not phone_number:
-            context.log.warning("⚠️  SIGNAL_PHONE_NUMBER non défini, notification non envoyée")
-            return
-        
-        client = SignalClient(phone_number=phone_number)
-        
-        # Récupérer les tags du run
-        tags = {}
-        if hasattr(context, 'dagster_run') and context.dagster_run:
-            tags = getattr(context.dagster_run, 'tags', {})
-        
-        # Récupérer les infos du sender depuis les tags
-        sender_name = tags.get("sender_name", "").strip()
-        sender_number = tags.get("sender_number", "").strip()
-        sender_uuid = tags.get("sender_uuid", "").strip()
-        group_id = tags.get("group_id", "") or ""
-        group_name = tags.get("group_name", "")
-        
-        # Construire la mention de l'utilisateur
-        mention = None
-        if sender_name and sender_name.strip() and sender_name.lower() not in ["unknown", "none", ""]:
-            mention_name = sender_name.split()[0] if " " in sender_name else sender_name
-            mention = f"@{mention_name}"
-        elif sender_number and sender_number.strip():
-            mention = f"@{sender_number[-4:]}" if len(sender_number) >= 4 else f"@{sender_number}"
-        elif sender_uuid and sender_uuid.strip():
-            mention = f"@{sender_uuid[:8]}"
-        
-        if not mention:
-            mention = "@utilisateur"
-        
-        # Construire le message avec mention
-        emoji = "❌" if is_error else "✅"
-        full_text = f"{mention} {emoji} {text}"
-        
-        # Envoyer au groupe
-        if group_id and group_id.strip():
-            try:
-                client.send_to_group(group_id=group_id, text=full_text)
-                context.log.info(f"✅ Notification Signal envoyée au groupe {group_name or group_id}")
-                return
-            except Exception as e:
-                context.log.warning(f"⚠️  Erreur lors de l'envoi au groupe {group_id}: {e}")
-        
-        # Fallback: utiliser le group_id depuis l'env
-        env_group_id = os.getenv("SIGNAL_GROUP_ID")
-        if env_group_id and env_group_id.strip():
-            try:
-                client.send_to_group(group_id=env_group_id, text=full_text)
-                context.log.info(f"✅ Notification Signal envoyée au groupe par défaut (env): {env_group_id}")
-                return
-            except Exception as e:
-                context.log.warning(f"⚠️  Erreur lors de l'envoi au groupe par défaut {env_group_id}: {e}")
-        
-        context.log.warning("⚠️  Aucun groupe Signal trouvé pour envoyer la notification")
-            
-    except Exception as e:
-        context.log.warning(f"⚠️  Erreur lors de l'envoi de notification Signal: {e}")
 
 
 # ============================================================================
@@ -401,6 +331,70 @@ def receipt_in_db(
     }
 
 
+@asset(deps=[receipt_in_db])
+def notify_signal_success(
+    context: AssetExecutionContext,
+    receipt_in_db: Dict
+) -> None:
+    """
+    Asset final qui envoie une notification Signal de succès à l'utilisateur.
+    Il n'est exécuté que si tout le pipeline s'est bien déroulé.
+    """
+    phone_number = os.getenv("SIGNAL_PHONE_NUMBER")
+    if not phone_number:
+        context.log.warning("⚠️  SIGNAL_PHONE_NUMBER non défini, notification non envoyée")
+        return
+
+    client = SignalClient(phone_number=phone_number)
+
+    # Récupérer les tags du run pour trouver le groupe et le sender
+    tags = {}
+    if hasattr(context, "run") and context.run:
+        tags = context.run.tags or {}
+
+    sender_name = tags.get("sender_name", "").strip()
+    sender_number = tags.get("sender_number", "").strip()
+    sender_uuid = tags.get("sender_uuid", "").strip()
+    group_id = tags.get("group_id", "") or os.getenv("SIGNAL_GROUP_ID", "")
+    group_name = tags.get("group_name", "")
+
+    # Construire la mention
+    mention = None
+    if sender_name and sender_name.lower() not in ["unknown", "none", ""]:
+        mention_name = sender_name.split()[0] if " " in sender_name else sender_name
+        mention = f"@{mention_name}"
+    elif sender_number:
+        mention = f"@{sender_number[-4:]}" if len(sender_number) >= 4 else f"@{sender_number}"
+    elif sender_uuid:
+        mention = f"@{sender_uuid[:8]}"
+    else:
+        mention = "@utilisateur"
+
+    # Construire le message de succès
+    store_name = receipt_in_db.get("store_name", "Magasin")
+    total = receipt_in_db.get("total")
+    try:
+        total_str = f"{float(total):.2f} CHF" if total is not None else ""
+    except Exception:
+        total_str = str(total) if total is not None else ""
+
+    text = f"Ticket traité avec succès ! 🎉\n{store_name} - {total_str}"
+    full_text = f"{mention} ✅ {text}"
+
+    if not group_id:
+        context.log.warning(
+            "⚠️  Aucun group_id trouvé dans les tags ni dans SIGNAL_GROUP_ID, "
+            "notification Signal non envoyée."
+        )
+        return
+
+    try:
+        client.send_to_group(group_id=group_id, text=full_text)
+        context.log.info(f"✅ Notification Signal envoyée au groupe {group_name or group_id}")
+    except Exception as e:
+        context.log.warning(f"⚠️  Erreur lors de l'envoi de la notification Signal: {e}")
+
+
 # Job pour orchestrer tous les assets
 process_signal_message = define_asset_job(
     name="process_signal_message",
@@ -409,58 +403,7 @@ process_signal_message = define_asset_job(
         message_in_db,
         claude_extraction,
         transformed_receipt,
-        receipt_in_db
-    ]
+        receipt_in_db,
+        notify_signal_success,
+    ],
 )
-
-
-# Sensors pour les notifications (une seule notification à la fin du run)
-# Note: Les run_status_sensor sont la méthode recommandée par Dagster pour 
-# envoyer des notifications à la fin d'un run (pas de hooks de run intégrés)
-@run_status_sensor(
-    run_status=DagsterRunStatus.SUCCESS,
-    monitored_jobs=[process_signal_message]
-)
-def notify_signal_success_sensor(context: RunStatusSensorContext):
-    """
-    Sensor qui envoie une notification en cas de succès du job (une seule fois à la fin)
-    Se déclenche automatiquement quand le run se termine avec SUCCESS
-    """
-    message = "Ticket traité avec succès ! 🎉"
-    send_signal_notification_from_run_context(
-        context=context,
-        text=message,
-        is_error=False
-    )
-
-
-@run_status_sensor(
-    run_status=DagsterRunStatus.FAILURE,
-    monitored_jobs=[process_signal_message]
-)
-def notify_signal_failure_sensor(context: RunStatusSensorContext):
-    """
-    Sensor qui envoie une notification en cas d'échec du job (une seule fois à la fin)
-    Se déclenche automatiquement quand le run se termine avec FAILURE
-    """
-    # Récupérer l'erreur depuis le run
-    error = "Unknown error"
-    if hasattr(context, 'dagster_run') and context.dagster_run:
-        # Essayer de récupérer l'erreur depuis les événements du run
-        if hasattr(context.dagster_run, 'failure_reason') and context.dagster_run.failure_reason:
-            error = str(context.dagster_run.failure_reason)
-        elif hasattr(context.dagster_run, 'tags'):
-            # Parfois l'erreur est dans les tags
-            error = context.dagster_run.tags.get('dagster/error', error)
-    
-    # Limiter la taille de l'erreur
-    if len(error) > 200:
-        error = error[:200] + "..."
-    
-    message = f"Échec du traitement du ticket\n\n❌ Erreur: {error}"
-    
-    send_signal_notification_from_run_context(
-        context=context,
-        text=message,
-        is_error=True
-    )

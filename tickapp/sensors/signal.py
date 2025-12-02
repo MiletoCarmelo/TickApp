@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 
-from tickapp.clients.signal_client import SignalClient, Message
+from tickapp.clients.signal_client import SignalClient, Message, SignalCLINotFound
 from tickapp.clients.database_client import DatabaseClient
 
 load_dotenv()
@@ -55,7 +55,17 @@ def get_new_messages(context: SensorEvaluationContext) -> List[tuple]:
         context.log.error("SIGNAL_PHONE_NUMBER non défini")
         return []
     
-    client = SignalClient(phone_number=phone_number)
+    # Initialiser le client Signal
+    # Dans le container Docker, si signal-cli n'est pas disponible ou mal installé,
+    # on ne veut pas faire planter tout le sensor : on loggue et on skip.
+    try:
+        client = SignalClient(phone_number=phone_number)
+    except SignalCLINotFound as e:
+        context.log.warning(
+            f"⚠️  signal-cli introuvable dans l'environnement Dagster: {e}. "
+            f"Le sensor Signal est désactivé (aucun nouveau message ne sera traité)."
+        )
+        return []
     
     # Recevoir les messages récents
     raw_messages = client.receive(number_of_messages=10)  # Limiter pour éviter de surcharger

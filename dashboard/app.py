@@ -17,8 +17,10 @@ load_dotenv()
 
 # Configuration de la base de données
 DB_CONFIG = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'port': int(os.getenv('DB_PORT', '5434')),
+    # Par défaut, dans Docker on se connecte au service postgres sur le port interne 5432
+    # En local (hors Docker), tu peux surcharger via .env (ex: DB_HOST=localhost, DB_PORT=5434)
+    'host': os.getenv('DB_HOST', 'postgres'),
+    'port': int(os.getenv('DB_PORT', '5432')),
     'database': os.getenv('DB_NAME', 'receipt_processing'),
     'user': os.getenv('DB_USER', 'receipt_user'),
     'password': os.getenv('DB_PASSWORD', 'SuperSecretPassword123!')
