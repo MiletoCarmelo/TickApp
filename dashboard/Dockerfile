@@ -1,4 +1,4 @@
-# Dockerfile pour le dashboard Dash
+# Dockerfile pour le dashboard Dash - Version Moderne (Fixed)
 FROM python:3.11-slim
 
 # Installer les dépendances système
@@ -30,4 +30,3 @@ EXPOSE 8050
 
 # Commande par défaut
 CMD ["python", "app.py"]
-

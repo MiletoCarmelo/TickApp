@@ -1,0 +1,342 @@
+/* TickApp Dashboard - Modern Styles */
+
+/* Import de la police Inter pour une typographie moderne */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Variables CSS pour une palette cohérente */
+:root {
+    --primary-color: #4F46E5;
+    --primary-hover: #4338CA;
+    --secondary-color: #06B6D4;
+    --success-color: #10B981;
+    --warning-color: #F59E0B;
+    --danger-color: #EF4444;
+    --background: #F8FAFC;
+    --card-bg: #FFFFFF;
+    --text-primary: #1E293B;
+    --text-secondary: #64748B;
+    --border-color: #E2E8F0;
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+}
+
+/* Reset et base */
+* {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body {
+    background: var(--background);
+    color: var(--text-primary);
+}
+
+/* Container principal */
+.container-fluid {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+}
+
+/* Header moderne */
+h1 {
+    font-weight: 700;
+    font-size: 2.5rem;
+    color: var(--text-primary);
+    letter-spacing: -0.025em;
+}
+
+h1 i {
+    color: var(--primary-color);
+}
+
+/* Cards modernisées avec glassmorphism subtil */
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Métriques cards avec gradient subtil */
+.card.shadow-sm {
+    position: relative;
+    overflow: visible;
+}
+
+.card.shadow-sm::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+/* Couleurs pour les différentes métriques */
+.card .text-primary {
+    color: var(--primary-color) !important;
+    font-weight: 700;
+    font-size: 2rem;
+}
+
+.card .text-success {
+    color: var(--success-color) !important;
+    font-weight: 700;
+    font-size: 2rem;
+}
+
+.card .text-info {
+    color: var(--secondary-color) !important;
+    font-weight: 700;
+    font-size: 2rem;
+}
+
+.card .text-warning {
+    color: var(--warning-color) !important;
+    font-weight: 700;
+    font-size: 2rem;
+}
+
+/* Labels des filtres */
+label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+/* Date picker moderne */
+.DateInput_input {
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    transition: all 0.2s;
+}
+
+.DateInput_input:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.DateRangePickerInput {
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background: white;
+}
+
+/* Dropdown moderne */
+.Select-control {
+    border-radius: var(--radius-sm) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: none !important;
+    transition: all 0.2s;
+}
+
+.Select-control:hover {
+    border-color: var(--primary-color) !important;
+}
+
+.Select-menu-outer {
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    margin-top: 0.25rem;
+}
+
+/* Dropdown Dash moderne */
+.dash-dropdown .Select-control,
+.dash-dropdown .dropdown {
+    border-radius: var(--radius-sm) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+/* Graphiques avec coins arrondis */
+.js-plotly-plot .plotly {
+    border-radius: var(--radius-md);
+}
+
+.js-plotly-plot .plotly .svg-container {
+    border-radius: var(--radius-md);
+}
+
+/* Table moderne */
+.dash-table-container {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.dash-table-container .dash-spreadsheet-container {
+    border-radius: var(--radius-md);
+}
+
+table.dash-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner table {
+    border-radius: var(--radius-md);
+}
+
+/* En-têtes de table */
+.dash-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%) !important;
+    border: none !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem !important;
+}
+
+/* Cellules de table */
+.dash-cell {
+    border: none !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: 1rem !important;
+    font-size: 0.875rem;
+}
+
+/* Lignes alternées */
+tr:nth-child(even) .dash-cell {
+    background-color: rgba(248, 250, 252, 0.5) !important;
+}
+
+tr:hover .dash-cell {
+    background-color: rgba(79, 70, 229, 0.05) !important;
+    transition: background-color 0.2s;
+}
+
+/* Pagination de la table */
+.dash-table-container .previous-next-container {
+    padding: 1rem;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border-color);
+}
+
+.dash-table-container .page-number {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    margin: 0 0.25rem;
+    transition: all 0.2s;
+}
+
+.dash-table-container .page-number:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.dash-table-container .page-number.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+/* Textes et labels */
+.text-muted {
+    color: var(--text-secondary) !important;
+}
+
+.small {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.025em;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 1.75rem;
+    }
+    
+    .container-fluid {
+        padding: 1rem;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .card .text-primary,
+    .card .text-success,
+    .card .text-info,
+    .card .text-warning {
+        font-size: 1.5rem;
+    }
+}
+
+/* Animation au chargement */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+/* Loading spinner moderne */
+.dash-spinner {
+    border-color: var(--primary-color);
+}
+
+/* Amélioration des graphiques Plotly */
+.js-plotly-plot .plotly .modebar {
+    display: none !important;
+}
+
+/* Style pour le message "dernière mise à jour" */
+#last-update {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    background: rgba(79, 70, 229, 0.05);
+    border-radius: var(--radius-sm);
+    display: inline-block;
+}
+
+/* Ajustements pour les graphiques */
+.card-body > div > div {
+    border-radius: var(--radius-md);
+}
