@@ -1,17 +1,23 @@
 """
-Dashboard Dash pour visualiser les données de tickets/reçus
-Version modernisée avec design épuré
+Dashboard Streamlit pour visualiser les données de tickets/reçus
+Version moderne et simple
 """
 import os
 from dotenv import load_dotenv
-import dash
-from dash import dcc, html, Input, Output, State, dash_table
-import dash_bootstrap_components as dbc
+import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import psycopg2
 from datetime import datetime, timedelta
+
+# Configuration de la page (doit être la première commande Streamlit)
+st.set_page_config(
+    page_title="TickApp Dashboard",
+    page_icon="🧾",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
 # Charger les variables d'environnement
 load_dotenv()
@@ -25,26 +31,87 @@ DB_CONFIG = {
     'password': os.getenv('DB_PASSWORD', 'SuperSecretPassword123!')
 }
 
-# Initialiser l'application Dash avec thème moderne
-app = dash.Dash(
-    __name__,
-    external_stylesheets=[
-        dbc.themes.BOOTSTRAP,
-        dbc.icons.FONT_AWESOME,
-        "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-    ],
-    suppress_callback_exceptions=True
-)
+# Palette de couleurs moderne
+COLORS = {
+    'primary': '#4F46E5',
+    'secondary': '#06B6D4',
+    'success': '#10B981',
+    'warning': '#F59E0B',
+    'categories': ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
+}
 
-app.title = "TickApp Dashboard - Analyse des Dépenses"
+# CSS personnalisé pour un look moderne
+st.markdown("""
+<style>
+    /* Import de la police Inter */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    /* Appliquer Inter partout */
+    * {
+        font-family: 'Inter', sans-serif !important;
+    }
+    
+    /* Réduire les espacements */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 0rem !important;
+        max-width: 1400px !important;
+    }
+    
+    /* Titre principal */
+    h1 {
+        font-size: 1.75rem !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.025em !important;
+        margin-bottom: 0.25rem !important;
+    }
+    
+    /* Sous-titre */
+    .subtitle {
+        color: #64748B;
+        font-size: 0.85rem;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    
+    /* Cartes métriques */
+    [data-testid="stMetricValue"] {
+        font-size: 1.25rem !important;
+        font-weight: 700 !important;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        font-size: 0.75rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600 !important;
+    }
+    
+    /* Réduire l'espace entre les graphiques */
+    [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] {
+        gap: 0.5rem;
+    }
+    
+    /* Style des filtres */
+    .stDateInput label, .stMultiSelect label {
+        font-size: 0.75rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600 !important;
+        color: #64748B !important;
+    }
+    
+    /* Hauteur réduite pour les graphiques */
+    .js-plotly-plot {
+        height: 180px !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Fonction pour récupérer les données depuis PostgreSQL
-def get_db_connection():
-    """Établit une connexion à la base de données"""
-    return psycopg2.connect(**DB_CONFIG)
-
+@st.cache_data(ttl=60)
 def get_transactions_data():
-    """Récupère les données des transactions (base pour tous les graphiques)."""
+    """Récupère les données des transactions avec cache de 60 secondes."""
     query = """
     SELECT 
         t.transaction_id,
@@ -65,578 +132,202 @@ def get_transactions_data():
     GROUP BY t.transaction_id, s.store_id, tc.category_id
     ORDER BY t.transaction_date DESC, t.transaction_time DESC
     """
-    conn = get_db_connection()
+    conn = psycopg2.connect(**DB_CONFIG)
     df = pd.read_sql_query(query, conn)
     conn.close()
     df["transaction_date"] = pd.to_datetime(df["transaction_date"])
     return df
 
-def filter_transactions(df: pd.DataFrame, start_date: str | None, end_date: str | None, categories: list | None):
-    """Applique les filtres de date et de catégorie sur le DataFrame."""
+def filter_transactions(df, start_date, end_date, categories):
+    """Applique les filtres de date et de catégorie."""
+    df_filtered = df.copy()
     if start_date:
-        df = df[df["transaction_date"] >= pd.to_datetime(start_date)]
+        df_filtered = df_filtered[df_filtered["transaction_date"] >= pd.to_datetime(start_date)]
     if end_date:
-        df = df[df["transaction_date"] <= pd.to_datetime(end_date)]
+        df_filtered = df_filtered[df_filtered["transaction_date"] <= pd.to_datetime(end_date)]
     if categories:
-        df = df[df["transaction_category"].isin(categories)]
-    return df
+        df_filtered = df_filtered[df_filtered["transaction_category"].isin(categories)]
+    return df_filtered
 
-# Palette de couleurs moderne
-COLORS = {
-    'primary': '#4F46E5',
-    'secondary': '#06B6D4',
-    'success': '#10B981',
-    'warning': '#F59E0B',
-    'categories': ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
-}
+# Header
+st.markdown("# 🧾 TickApp Dashboard")
+st.markdown('<p class="subtitle">Analyse moderne des dépenses</p>', unsafe_allow_html=True)
 
-# Layout de l'application
-app.layout = dbc.Container(
-    [
-        # Header avec style moderne
-        dbc.Row(
-            [
-                dbc.Col(
-                    [
-                        html.H1(
-                            [
-                                html.I(className="fas fa-receipt me-3"),
-                                "TickApp Dashboard"
-                            ],
-                            className="text-center mb-1 mt-2",
-                            style={'fontWeight': '700', 'letterSpacing': '-0.025em', 'fontSize': '2rem'}
-                        ),
-                        html.P(
-                            "Analyse moderne des dépenses par personne, magasin et catégorie",
-                            className="text-center mb-3",
-                            style={'color': '#64748B', 'fontSize': '0.95rem'}
-                        ),
-                    ]
-                )
-            ]
-        ),
-        
-        # Filtres dans une card moderne
-        dbc.Card(
-            dbc.CardBody(
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            [
-                                html.Label("PÉRIODE", className="fw-bold small"),
-                                dcc.DatePickerRange(
-                                    id="date-range",
-                                    display_format="DD/MM/YYYY",
-                                    minimum_nights=0,
-                                    start_date=(datetime.now() - timedelta(days=30)).date(),
-                                    end_date=datetime.now().date(),
-                                    style={'width': '100%'}
-                                ),
-                            ],
-                            md=4,
-                            className="mb-3 mb-md-0",
-                        ),
-                        dbc.Col(
-                            [
-                                html.Label("CATÉGORIES", className="fw-bold small"),
-                                dcc.Dropdown(
-                                    id="category-filter",
-                                    options=[
-                                        {"label": "🔵 Carmelo", "value": "carmelo"},
-                                        {"label": "🟠 Heather", "value": "heather"},
-                                        {"label": "🟢 Neon", "value": "neon"},
-                                    ],
-                                    placeholder="Toutes les catégories",
-                                    multi=True,
-                                    style={'borderRadius': '8px'}
-                                ),
-                            ],
-                            md=4,
-                            className="mb-3 mb-md-0",
-                        ),
-                        dbc.Col(
-                            [
-                                html.Label("DERNIÈRE MISE À JOUR", className="fw-bold small"),
-                                html.Div(
-                                    id="last-update",
-                                    style={
-                                        'padding': '0.5rem 1rem',
-                                        'background': 'rgba(79, 70, 229, 0.05)',
-                                        'borderRadius': '8px',
-                                        'fontSize': '0.875rem',
-                                        'fontWeight': '500',
-                                        'color': '#64748B'
-                                    }
-                                ),
-                            ],
-                            md=4,
-                        ),
-                    ],
-                ),
-            ),
-            className="mb-3",
-            style={'borderRadius': '16px', 'border': '1px solid #E2E8F0'}
-        ),
-        
-        # Métriques principales avec design moderne
-        dbc.Row(
-            [
-                dbc.Col(
-                    dbc.Card(
-                        dbc.CardBody(
-                            [
-                                html.Div(
-                                    [
-                                        html.I(className="fas fa-wallet me-2", style={'color': COLORS['primary']}),
-                                        "Total dépensé"
-                                    ],
-                                    className="small mb-2",
-                                    style={'color': '#64748B', 'fontWeight': '600'}
-                                ),
-                                html.H3(
-                                    id="total-spent",
-                                    className="mb-0",
-                                    style={'color': COLORS['primary'], 'fontWeight': '700', 'fontSize': '1.5rem'}
-                                ),
-                            ],
-                            style={'padding': '1rem'}
-                        ),
-                        className="h-100",
-                        style={'borderRadius': '16px', 'border': '1px solid #E2E8F0', 'borderTop': f'4px solid {COLORS["primary"]}'}
-                    ),
-                    md=3,
-                    className="mb-3",
-                ),
-                dbc.Col(
-                    dbc.Card(
-                        dbc.CardBody(
-                            [
-                                html.Div(
-                                    [
-                                        html.I(className="fas fa-shopping-cart me-2", style={'color': COLORS['success']}),
-                                        "Transactions"
-                                    ],
-                                    className="small mb-2",
-                                    style={'color': '#64748B', 'fontWeight': '600'}
-                                ),
-                                html.H3(
-                                    id="total-transactions",
-                                    className="mb-0",
-                                    style={'color': COLORS['success'], 'fontWeight': '700', 'fontSize': '1.5rem'}
-                                ),
-                            ],
-                            style={'padding': '1rem'}
-                        ),
-                        className="h-100",
-                        style={'borderRadius': '16px', 'border': '1px solid #E2E8F0', 'borderTop': f'4px solid {COLORS["success"]}'}
-                    ),
-                    md=3,
-                    className="mb-3",
-                ),
-                dbc.Col(
-                    dbc.Card(
-                        dbc.CardBody(
-                            [
-                                html.Div(
-                                    [
-                                        html.I(className="fas fa-chart-line me-2", style={'color': COLORS['secondary']}),
-                                        "Moyenne"
-                                    ],
-                                    className="small mb-2",
-                                    style={'color': '#64748B', 'fontWeight': '600'}
-                                ),
-                                html.H3(
-                                    id="avg-transaction",
-                                    className="mb-0",
-                                    style={'color': COLORS['secondary'], 'fontWeight': '700', 'fontSize': '1.5rem'}
-                                ),
-                            ],
-                            style={'padding': '1rem'}
-                        ),
-                        className="h-100",
-                        style={'borderRadius': '16px', 'border': '1px solid #E2E8F0', 'borderTop': f'4px solid {COLORS["secondary"]}'}
-                    ),
-                    md=3,
-                    className="mb-3",
-                ),
-                dbc.Col(
-                    dbc.Card(
-                        dbc.CardBody(
-                            [
-                                html.Div(
-                                    [
-                                        html.I(className="fas fa-store me-2", style={'color': COLORS['warning']}),
-                                        "Magasins"
-                                    ],
-                                    className="small mb-2",
-                                    style={'color': '#64748B', 'fontWeight': '600'}
-                                ),
-                                html.H3(
-                                    id="total-stores",
-                                    className="mb-0",
-                                    style={'color': COLORS['warning'], 'fontWeight': '700', 'fontSize': '1.5rem'}
-                                ),
-                            ],
-                            style={'padding': '1rem'}
-                        ),
-                        className="h-100",
-                        style={'borderRadius': '16px', 'border': '1px solid #E2E8F0', 'borderTop': f'4px solid {COLORS["warning"]}'}
-                    ),
-                    md=3,
-                    className="mb-3",
-                ),
-            ],
-        ),
-        
-        # Graphique d'évolution en pleine largeur
-        dbc.Row(
-            [
-                dbc.Col(
-                    dbc.Card(
-                        [
-                            dbc.CardHeader(
-                                [
-                                    html.I(className="fas fa-chart-area me-2"),
-                                    "Évolution des dépenses"
-                                ],
-                                style={'background': 'linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'}
-                            ),
-                            dbc.CardBody(
-                                [dcc.Graph(id="spending-timeline", config={"displayModeBar": False})],
-                                style={'padding': '1rem'}
-                            ),
-                        ],
-                        style={'borderRadius': '16px', 'border': '1px solid #E2E8F0'}
-                    ),
-                    md=12,
-                    className="mb-3"
-                )
-            ]
-        ),
-        
-        # Graphiques côte à côte
-        dbc.Row(
-            [
-                dbc.Col(
-                    dbc.Card(
-                        [
-                            dbc.CardHeader(
-                                [
-                                    html.I(className="fas fa-chart-pie me-2"),
-                                    "Dépenses par catégorie"
-                                ],
-                                style={'background': 'linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'}
-                            ),
-                            dbc.CardBody(
-                                [dcc.Graph(id="spending-by-category", config={"displayModeBar": False})],
-                                style={'padding': '1rem'}
-                            ),
-                        ],
-                        style={'borderRadius': '16px', 'border': '1px solid #E2E8F0'}
-                    ),
-                    md=6,
-                    className="mb-3",
-                ),
-                dbc.Col(
-                    dbc.Card(
-                        [
-                            dbc.CardHeader(
-                                [
-                                    html.I(className="fas fa-store me-2"),
-                                    "Top 15 magasins"
-                                ],
-                                style={'background': 'linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'}
-                            ),
-                            dbc.CardBody(
-                                [dcc.Graph(id="spending-by-store", config={"displayModeBar": False})],
-                                style={'padding': '1rem'}
-                            ),
-                        ],
-                        style={'borderRadius': '16px', 'border': '1px solid #E2E8F0'}
-                    ),
-                    md=6,
-                    className="mb-3",
-                ),
-            ]
-        ),
-        
-        # Table des transactions récentes
-        dbc.Row(
-            dbc.Col(
-                dbc.Card(
-                    [
-                        dbc.CardHeader(
-                            [
-                                html.I(className="fas fa-list me-2"),
-                                "Transactions récentes"
-                            ],
-                            style={'background': 'linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)'}
-                        ),
-                        dbc.CardBody(
-                            [html.Div(id="transactions-table")],
-                            style={'padding': '1rem'}
-                        ),
-                    ],
-                    style={'borderRadius': '16px', 'border': '1px solid #E2E8F0'}
-                ),
-                md=12,
-                className="mb-2"
-            )
-        ),
-        
-        # Intervalle de rafraîchissement
-        dcc.Interval(id="interval-component", interval=60 * 1000, n_intervals=0),
-    ],
-    fluid=True,
-    style={'maxWidth': '1400px', 'padding': '1rem 1rem'}
-)
-
-# Callbacks pour les métriques
-@app.callback(
-    [
-        Output("total-spent", "children"),
-        Output("total-transactions", "children"),
-        Output("avg-transaction", "children"),
-        Output("total-stores", "children"),
-        Output("last-update", "children"),
-    ],
-    [
-        Input("interval-component", "n_intervals"),
-        Input("date-range", "start_date"),
-        Input("date-range", "end_date"),
-        Input("category-filter", "value"),
-    ],
-)
-def update_metrics(n, start_date, end_date, categories):
-    try:
-        df = get_transactions_data()
-        df = filter_transactions(df, start_date, end_date, categories)
-        if df.empty:
-            return "0.00 CHF", "0", "0.00 CHF", "0", "Aucune donnée"
-        total_spent = f"{df['total'].sum():.2f} CHF"
-        total_transactions = f"{len(df)}"
-        avg_transaction = f"{df['total'].mean():.2f} CHF"
-        total_stores = f"{df['store_name'].nunique()}"
-        last_update = datetime.now().strftime("%d/%m/%Y %H:%M")
-        return total_spent, total_transactions, avg_transaction, total_stores, last_update
-    except Exception:
-        return "Erreur", "Erreur", "Erreur", "Erreur", "Erreur"
-
-# Callback pour le graphique d'évolution
-@app.callback(
-    Output("spending-timeline", "figure"),
-    [
-        Input("interval-component", "n_intervals"),
-        Input("date-range", "start_date"),
-        Input("date-range", "end_date"),
-        Input("category-filter", "value"),
-    ],
-)
-def update_timeline(n, start_date, end_date, categories):
-    try:
-        df = get_transactions_data()
-        df = filter_transactions(df, start_date, end_date, categories)
-        if df.empty:
-            return go.Figure()
-        timeline = (
-            df.groupby(df["transaction_date"].dt.date)["total"]
-            .sum()
-            .reset_index(name="total_spent")
-            .sort_values("transaction_date")
+# Charger les données
+try:
+    df = get_transactions_data()
+    
+    # Filtres dans une ligne compacte
+    col_f1, col_f2, col_f3 = st.columns([2, 2, 1])
+    
+    with col_f1:
+        date_range = st.date_input(
+            "Période",
+            value=(datetime.now() - timedelta(days=30), datetime.now()),
+            max_value=datetime.now()
         )
-        fig = px.line(
-            timeline,
-            x="transaction_date",
-            y="total_spent",
-            labels={"transaction_date": "Date", "total_spent": "Montant (CHF)"},
+    
+    with col_f2:
+        categories = st.multiselect(
+            "Catégories",
+            options=df["transaction_category"].dropna().unique().tolist(),
+            default=None,
+            placeholder="Toutes les catégories"
         )
-        fig.update_traces(
-            line_color=COLORS['primary'],
-            line_width=3,
-            fill='tozeroy',
-            fillcolor=f'rgba(79, 70, 229, 0.1)'
-        )
-        fig.update_layout(
-            margin=dict(l=20, r=20, t=10, b=20),
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            hovermode="x unified",
-            font=dict(family="Inter, sans-serif", size=11, color="#64748B"),
-            xaxis=dict(gridcolor='rgba(226, 232, 240, 0.5)'),
-            yaxis=dict(gridcolor='rgba(226, 232, 240, 0.5)'),
-            height=250
-        )
-        return fig
-    except Exception:
-        return go.Figure()
-
-# Callback pour le graphique par catégorie
-@app.callback(
-    Output("spending-by-category", "figure"),
-    [
-        Input("interval-component", "n_intervals"),
-        Input("date-range", "start_date"),
-        Input("date-range", "end_date"),
-        Input("category-filter", "value"),
-    ],
-)
-def update_category_chart(n, start_date, end_date, categories):
-    try:
-        df = get_transactions_data()
-        df = filter_transactions(df, start_date, end_date, categories)
-        if df.empty:
-            return go.Figure()
+    
+    with col_f3:
+        st.markdown(f"""
+        <div style='margin-top: 1.5rem; font-size: 0.75rem; color: #64748B;'>
+            <strong>MàJ:</strong> {datetime.now().strftime('%H:%M')}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Appliquer les filtres
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+    else:
+        start_date = end_date = date_range[0] if date_range else None
+    
+    df_filtered = filter_transactions(df, start_date, end_date, categories)
+    
+    # Métriques principales
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        total = df_filtered["total"].sum()
+        st.metric("💰 Total dépensé", f"{total:.2f} CHF")
+    
+    with col2:
+        transactions = len(df_filtered)
+        st.metric("🛒 Transactions", f"{transactions}")
+    
+    with col3:
+        avg = df_filtered["total"].mean() if len(df_filtered) > 0 else 0
+        st.metric("📊 Moyenne", f"{avg:.2f} CHF")
+    
+    with col4:
+        stores = df_filtered["store_name"].nunique()
+        st.metric("🏪 Magasins", f"{stores}")
+    
+    # Graphique d'évolution (pleine largeur)
+    st.markdown("### 📈 Évolution des dépenses")
+    timeline = (
+        df_filtered.groupby(df_filtered["transaction_date"].dt.date)["total"]
+        .sum()
+        .reset_index(name="total_spent")
+        .sort_values("transaction_date")
+    )
+    
+    fig_timeline = px.line(
+        timeline,
+        x="transaction_date",
+        y="total_spent",
+        labels={"transaction_date": "Date", "total_spent": "Montant (CHF)"}
+    )
+    fig_timeline.update_traces(
+        line_color=COLORS['primary'],
+        line_width=3,
+        fill='tozeroy',
+        fillcolor=f'rgba(79, 70, 229, 0.1)'
+    )
+    fig_timeline.update_layout(
+        margin=dict(l=10, r=10, t=10, b=10),
+        height=180,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        hovermode="x unified",
+        font=dict(family="Inter", size=10),
+        xaxis=dict(gridcolor='rgba(226, 232, 240, 0.5)'),
+        yaxis=dict(gridcolor='rgba(226, 232, 240, 0.5)')
+    )
+    st.plotly_chart(fig_timeline, use_container_width=True)
+    
+    # Graphiques côte à côte
+    col_g1, col_g2 = st.columns(2)
+    
+    with col_g1:
+        st.markdown("### 🥧 Dépenses par catégorie")
         cat = (
-            df.groupby("transaction_category")["total"]
+            df_filtered.groupby("transaction_category")["total"]
             .sum()
             .reset_index(name="total_spent")
             .sort_values("total_spent", ascending=False)
         )
-        fig = px.pie(
+        
+        fig_cat = px.pie(
             cat,
             values="total_spent",
             names="transaction_category",
             hole=0.5,
             color_discrete_sequence=COLORS['categories']
         )
-        fig.update_traces(
+        fig_cat.update_traces(
             textposition="outside",
             textinfo="percent+label",
             marker=dict(line=dict(color='white', width=2))
         )
-        fig.update_layout(
+        fig_cat.update_layout(
             margin=dict(l=10, r=10, t=10, b=10),
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Inter, sans-serif", size=11, color="#64748B"),
+            height=180,
             showlegend=True,
-            height=250
+            font=dict(family="Inter", size=10)
         )
-        return fig
-    except Exception:
-        return go.Figure()
-
-# Callback pour le graphique par magasin
-@app.callback(
-    Output("spending-by-store", "figure"),
-    [
-        Input("interval-component", "n_intervals"),
-        Input("date-range", "start_date"),
-        Input("date-range", "end_date"),
-        Input("category-filter", "value"),
-    ],
-)
-def update_store_chart(n, start_date, end_date, categories):
-    try:
-        df = get_transactions_data()
-        df = filter_transactions(df, start_date, end_date, categories)
-        if df.empty:
-            return go.Figure()
+        st.plotly_chart(fig_cat, use_container_width=True)
+    
+    with col_g2:
+        st.markdown("### 🏪 Top 15 magasins")
         store = (
-            df.groupby(["store_name", "city"])["total"]
+            df_filtered.groupby(["store_name", "city"])["total"]
             .sum()
             .reset_index(name="total_spent")
             .sort_values("total_spent", ascending=False)
             .head(15)
         )
         store["label"] = store["store_name"] + " (" + store["city"].fillna("") + ")"
-        fig = px.bar(
+        
+        fig_store = px.bar(
             store,
             x="total_spent",
             y="label",
             orientation="h",
-            labels={"total_spent": "Montant (CHF)", "label": "Magasin"},
+            labels={"total_spent": "Montant (CHF)", "label": "Magasin"}
         )
-        fig.update_traces(
+        fig_store.update_traces(
             marker_color=COLORS['secondary'],
-            marker_line_color=COLORS['secondary'],
             marker_line_width=0
         )
-        fig.update_layout(
-            margin=dict(l=10, r=10, t=10, b=20),
+        fig_store.update_layout(
+            margin=dict(l=10, r=10, t=10, b=10),
+            height=180,
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
             yaxis={"categoryorder": "total ascending"},
-            font=dict(family="Inter, sans-serif", size=11, color="#64748B"),
-            xaxis=dict(gridcolor='rgba(226, 232, 240, 0.5)'),
             yaxis_title="",
-            height=250
+            font=dict(family="Inter", size=10),
+            xaxis=dict(gridcolor='rgba(226, 232, 240, 0.5)')
         )
-        return fig
-    except Exception:
-        return go.Figure()
+        st.plotly_chart(fig_store, use_container_width=True)
+    
+    # Table des transactions récentes
+    st.markdown("### 📋 Transactions récentes")
+    df_table = df_filtered.head(20).copy()
+    df_table["Date"] = df_table["transaction_date"].dt.strftime("%d/%m/%Y")
+    df_table["Montant"] = df_table["total"].apply(lambda x: f"{x:.2f} CHF")
+    
+    st.dataframe(
+        df_table[["Date", "store_name", "city", "transaction_category", "Montant", "payment_method", "item_count"]]
+        .rename(columns={
+            "store_name": "Magasin",
+            "city": "Ville",
+            "transaction_category": "Catégorie",
+            "payment_method": "Paiement",
+            "item_count": "Articles"
+        }),
+        use_container_width=True,
+        height=250,
+        hide_index=True
+    )
 
-# Callback pour la table des transactions
-@app.callback(
-    Output("transactions-table", "children"),
-    [
-        Input("interval-component", "n_intervals"),
-        Input("date-range", "start_date"),
-        Input("date-range", "end_date"),
-        Input("category-filter", "value"),
-    ],
-)
-def update_transactions_table(n, start_date, end_date, categories):
-    try:
-        df = get_transactions_data()
-        df = filter_transactions(df, start_date, end_date, categories)
-        df = df.head(50)
-        if df.empty:
-            return html.Div(
-                "Aucune transaction pour les filtres sélectionnés.",
-                style={'color': '#64748B', 'textAlign': 'center', 'padding': '2rem'}
-            )
-        df["transaction_date"] = df["transaction_date"].dt.strftime("%d/%m/%Y")
-        df["total"] = df["total"].apply(lambda x: f"{x:.2f} CHF")
-
-        table = dash_table.DataTable(
-            data=df.to_dict("records"),
-            columns=[
-                {"name": "Date", "id": "transaction_date"},
-                {"name": "Magasin", "id": "store_name"},
-                {"name": "Ville", "id": "city"},
-                {"name": "Catégorie", "id": "transaction_category"},
-                {"name": "Montant", "id": "total"},
-                {"name": "Paiement", "id": "payment_method"},
-                {"name": "Articles", "id": "item_count"},
-            ],
-            style_cell={
-                'textAlign': 'left',
-                'padding': '1rem',
-                'fontFamily': 'Inter, sans-serif',
-                'fontSize': '0.875rem',
-                'border': 'none',
-                'borderBottom': '1px solid #E2E8F0'
-            },
-            style_header={
-                'backgroundColor': COLORS['primary'],
-                'color': 'white',
-                'fontWeight': '600',
-                'textTransform': 'uppercase',
-                'letterSpacing': '0.05em',
-                'fontSize': '0.75rem',
-                'border': 'none'
-            },
-            style_data_conditional=[
-                {
-                    'if': {'row_index': 'odd'},
-                    'backgroundColor': 'rgba(248, 250, 252, 0.5)'
-                },
-                {
-                    'if': {'state': 'active'},
-                    'backgroundColor': 'rgba(79, 70, 229, 0.05)',
-                    'border': 'none'
-                }
-            ],
-            page_size=10,
-            style_table={'borderRadius': '12px', 'overflow': 'hidden'}
-        )
-        return table
-    except Exception as e:
-        return html.Div(
-            f"Erreur: {str(e)}",
-            style={'color': '#EF4444', 'textAlign': 'center', 'padding': '2rem'}
-        )
-
-if __name__ == '__main__':
-    app.run_server(host='0.0.0.0', port=8050, debug=True)
+except Exception as e:
+    st.error(f"Erreur de connexion à la base de données: {str(e)}")
+    st.info("Vérifiez que PostgreSQL est accessible et que les variables d'environnement sont correctes.")

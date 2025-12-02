@@ -1,4 +1,4 @@
-# Dockerfile pour le dashboard Dash - Version Moderne (Fixed)
+# Dockerfile pour le dashboard Streamlit
 FROM python:3.11-slim
 
 # Installer les dépendances système
@@ -18,15 +18,15 @@ WORKDIR /app
 # Copier les fichiers de configuration Poetry
 COPY pyproject.toml poetry.lock* ./
 
-# Installer les dépendances avec Poetry (sans installer le projet lui-même)
+# Installer les dépendances avec Poetry
 RUN poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi --no-root
 
 # Copier le code de l'application dashboard
 COPY dashboard/ ./
 
-# Exposer le port pour Dash
-EXPOSE 8050
+# Exposer le port pour Streamlit
+EXPOSE 8501
 
-# Commande par défaut
-CMD ["python", "app.py"]
+# Commande par défaut pour Streamlit
+CMD ["streamlit", "run", "app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
