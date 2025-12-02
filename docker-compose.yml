@@ -4,7 +4,7 @@ services:
     container_name: receipt-postgres
     restart: unless-stopped
     env_file:
-      - .env  # ← Pointe vers la racine
+      - .env  # ← Doit contenir POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_PORT
     environment:
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
@@ -14,7 +14,8 @@ services:
       - ./pg/init_scripts:/docker-entrypoint-initdb.d:ro  # Scripts exécutés au 1er démarrage
       - ./backups:/backups  # Dossier pour les backups
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      # Utilise les variables d'environnement définies dans le conteneur (POSTGRES_USER, POSTGRES_DB)
+      test: ["CMD-SHELL", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -28,12 +28,13 @@ ON CONFLICT (store_name, city, postal_code) DO NOTHING;
 -- ============================================================================
 -- 2. SIGNAL_SENDER (Expéditeurs)
 -- ============================================================================
+-- Les UUID doivent être au format hexadécimal valide (0-9, a-f)
 INSERT INTO signal_sender (signal_uuid, phone_number, contact_name) VALUES
 ('6aef6f35-7fcd-44c3-a6a4-e4c69f43535c', '+41791234567', 'Carmelo'),
-('8bcd9f46-8gde-55d4-b7b5-f5d70g54646d', '+41792345678', 'Heather'),
-('9cde0g57-9hef-66e5-c8c6-g6e81h65757e', '+41793456789', 'Neon'),
-('0def1h68-0ifg-77f6-d9d7-h7f92i76868f', '+41794567890', 'Alice'),
-('1efg2i79-1jgh-88g7-e0e8-i8g03j87979g', '+41795678901', 'Bob')
+('8bcd9f46-8fde-55d4-b7b5-f5d70f54646d', '+41792345678', 'Heather'),
+('9cde0f57-9eef-66e5-c8c6-f6e81f65757e', '+41793456789', 'Neon'),
+('0def1f68-0eff-77f6-d9d7-f7f92f76868f', '+41794567890', 'Alice'),
+('1efg2f79-1eff-88f7-e0e8-f8f03f87979f', '+41795678901', 'Bob')
 ON CONFLICT (signal_uuid) DO NOTHING;
 
 -- ============================================================================
@@ -135,6 +136,79 @@ FROM message_data m
 CROSS JOIN LATERAL (SELECT store_id FROM store_data LIMIT 1) s
 CROSS JOIN LATERAL (SELECT category_id FROM category_data ORDER BY random() LIMIT 1) c
 LIMIT 50;
+
+-- 7b. Générer des transactions réalistes sur le dernier mois
+--    pour les trois catégories principales: carmelo, heather, neon
+INSERT INTO transaction (
+    message_id,
+    store_id,
+    transaction_category_id,
+    receipt_number,
+    transaction_date,
+    transaction_time,
+    currency,
+    total,
+    payment_method,
+    source
+)
+SELECT
+    NULL AS message_id,                                           -- Pas lié à un message Signal
+    s.store_id,
+    tc.category_id,
+    'SYN-' || to_char(d.jour, 'YYYYMMDD') || '-' || tc.name 
+        || '-' || LPAD((ROW_NUMBER() OVER (ORDER BY d.jour, tc.name))::TEXT, 3, '0') AS receipt_number,
+    d.jour::DATE AS transaction_date,
+    (TIME '08:00:00' + (random() * INTERVAL '12 hours'))::TIME AS transaction_time,
+    'CHF' AS currency,
+    -- Montants typiques différents selon la catégorie
+    CASE tc.name
+        WHEN 'carmelo' THEN (random() * 80 + 40)::DECIMAL(10, 2)   -- 40 à 120 CHF
+        WHEN 'heather' THEN (random() * 60 + 30)::DECIMAL(10, 2)   -- 30 à 90 CHF
+        WHEN 'neon'    THEN (random() * 40 + 10)::DECIMAL(10, 2)   -- 10 à 50 CHF
+        ELSE (random() * 50 + 20)::DECIMAL(10, 2)
+    END AS total,
+    CASE 
+        WHEN random() > 0.6 THEN 'Carte bancaire'
+        WHEN random() > 0.3 THEN 'Twint'
+        ELSE 'Espèces'
+    END AS payment_method,
+    'synthetic' AS source
+FROM generate_series(
+        (CURRENT_DATE - INTERVAL '29 days')::DATE,
+        CURRENT_DATE::DATE,
+        INTERVAL '1 day'
+     ) AS d(jour)
+JOIN transaction_category tc 
+    ON tc.name IN ('carmelo', 'heather', 'neon')
+CROSS JOIN LATERAL (
+    -- Choisir un magasin cohérent avec le type de dépense
+    SELECT store_id
+    FROM store
+    ORDER BY
+        CASE 
+            WHEN tc.name = 'carmelo' THEN 
+                CASE 
+                    WHEN store_name ILIKE '%Migros%' THEN 1
+                    WHEN store_name ILIKE '%Coop%' THEN 2
+                    ELSE 10
+                END
+            WHEN tc.name = 'heather' THEN 
+                CASE 
+                    WHEN store_name ILIKE '%Manor%' THEN 1
+                    WHEN store_name ILIKE '%Migros%' THEN 2
+                    ELSE 10
+                END
+            WHEN tc.name = 'neon' THEN 
+                CASE 
+                    WHEN store_name ILIKE '%Shell%' THEN 1
+                    WHEN store_name ILIKE '%BP%' THEN 2
+                    ELSE 10
+                END
+            ELSE 10
+        END,
+        random()
+    LIMIT 1
+) s;
 
 -- ============================================================================
 -- 8. TRANSACTION_ATTACHMENT_MAPPING
