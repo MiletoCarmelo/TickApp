@@ -174,7 +174,7 @@ SELECT
     END AS payment_method,
     'synthetic' AS source
 FROM generate_series(
-        (CURRENT_DATE - INTERVAL '29 days')::DATE,
+        (CURRENT_DATE - INTERVAL '90 days')::DATE,
         CURRENT_DATE::DATE,
         INTERVAL '1 day'
      ) AS d(jour)

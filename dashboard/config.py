@@ -8,11 +8,11 @@ load_dotenv()
 
 # Configuration de la base de données
 DB_CONFIG = {
-    'host': os.getenv('DB_HOST', 'postgres'),
-    'port': int(os.getenv('DB_PORT', '5432')),
-    'database': os.getenv('DB_NAME', 'receipt_processing'),
-    'user': os.getenv('DB_USER', 'receipt_user'),
-    'password': os.getenv('DB_PASSWORD', 'SuperSecretPassword123!')
+    'host': os.getenv('POSTGRE_HOST', 'localhost'),  # Changé DB_HOST → POSTGRE_HOST
+    'port': int(os.getenv('POSTGRES_PORT', '5434')),  # Changé DB_PORT → POSTGRES_PORT
+    'database': os.getenv('POSTGRES_DB', 'receipt_processing'),  # Changé DB_NAME → POSTGRES_DB
+    'user': os.getenv('POSTGRES_USER', 'receipt_user'),  # Changé DB_USER → POSTGRES_USER
+    'password': os.getenv('POSTGRES_PASSWORD', 'SuperSecretPassword123!')  # Changé DB_PASSWORD → POSTGRES_PASSWORD
 }
 
 # Palette de couleurs

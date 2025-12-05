@@ -43,6 +43,14 @@ else
     echo "4️⃣  Fichier de données fictives non trouvé, ignoré."
 fi
 
+# Creation des vues 
+if [ -f "pg/init_scripts/05-creation-views.sql" ]; then
+    echo "5️⃣  Création des vues..."
+    docker exec -i receipt-postgres psql -U receipt_user -d receipt_processing < pg/init_scripts/05-creation-views.sql
+else
+    echo "5️⃣  Fichier de vues non trouvé, ignoré."
+fi
+
 echo ""
 echo "✅ Base de données réinitialisée !"
 echo ""
