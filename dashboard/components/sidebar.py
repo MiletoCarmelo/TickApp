@@ -1,5 +1,6 @@
 """
 Composant Sidebar du dashboard
+
 """
 import streamlit as st
 from datetime import datetime, timedelta
@@ -9,20 +10,6 @@ from data import get_transactions_data
 def render_sidebar():
     """Affiche la sidebar avec navigation et statistiques"""
     with st.sidebar:
-        # Profile section
-        st.markdown("""
-        <div class="profile-section">
-            <div class="profile-avatar">👤</div>
-            <div class="profile-info">
-                <div class="profile-name">Carmelo</div>
-                <div class="profile-email">user@tickapp.com</div>
-            </div>
-            <div class="profile-toggle">
-                <span>︿</span>
-                <span>﹀</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
         
         # Main navigation
         page = st.radio(
