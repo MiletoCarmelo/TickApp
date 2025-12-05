@@ -1,75 +1,219 @@
-# TickApp Dashboard
+# 🎨 TickApp Dashboard - Structure Modulaire
 
-Dashboard Dash moderne pour visualiser les données de tickets/reçus.
+## 📁 Structure du projet
 
-## Fonctionnalités
+Le dashboard est maintenant organisé en modules pour une meilleure maintenabilité :
 
-- 📊 **Métriques principales** : Total dépensé, nombre de transactions, moyenne, magasins différents
-- 📈 **Graphiques interactifs** :
-  - Évolution des dépenses dans le temps
-  - Répartition des dépenses par catégorie (camembert)
-  - Top 15 magasins (graphique en barres)
-- 📋 **Table des transactions récentes** avec pagination
-- 🔄 **Rafraîchissement automatique** toutes les minutes
-
-## Installation
-
-Le dashboard est configuré pour fonctionner avec Docker Compose. Il se connecte automatiquement à la base de données PostgreSQL configurée dans `.env`.
-
-## Utilisation
-
-### Avec Docker Compose
-
-```bash
-# Démarrer tous les services (y compris le dashboard)
-docker-compose up -d
-
-# Le dashboard sera accessible sur http://localhost:8050
+```
+dashboard/
+├── app.py                 # Point d'entrée principal
+├── config.py              # Configuration (DB, couleurs)
+├── data.py                # Fonctions de récupération des données
+├── components/            # Composants réutilisables
+│   ├── __init__.py
+│   ├── styles.py          # Styles CSS
+│   └── sidebar.py         # Composant sidebar
+├── pages/                 # Pages individuelles
+│   ├── __init__.py
+│   ├── dashboard.py       # Page Dashboard principale
+│   ├── analytics.py       # Page Analytics
+│   ├── stores.py          # Page Stores
+│   ├── categories.py      # Page Categories
+│   ├── history.py         # Page History
+│   ├── transactions.py    # Page Transactions
+│   └── settings.py        # Page Settings
+├── assets/                # Assets statiques
+│   └── Styles.css
+├── dev.sh                 # Script de développement local
+├── Dockerfile
+└── README.md
 ```
 
-### Configuration
+## 🚀 Utilisation
 
-Le dashboard utilise les mêmes variables d'environnement que le reste de l'application (définies dans `.env`) :
+### Option 1 : Développement local (Recommandé pour le dev)
 
-- `DB_HOST` : Hôte PostgreSQL (défaut: localhost)
-- `DB_PORT` : Port PostgreSQL (défaut: 5434)
-- `DB_NAME` : Nom de la base de données (défaut: receipt_processing)
-- `DB_USER` : Utilisateur PostgreSQL
-- `DB_PASSWORD` : Mot de passe PostgreSQL
+**Avantages** : Hot-reload automatique, pas besoin de rebuild Docker
 
-Le port du dashboard peut être configuré via `DASHBOARD_PORT` dans `.env` (défaut: 8050).
+1. **Démarrer uniquement la base de données** :
+```bash
+docker-compose up -d postgres
+```
 
-### Accès via Tailscale
+2. **Lancer Streamlit localement** :
+```bash
+cd dashboard
+chmod +x dev.sh
+./dev.sh
+```
 
-Pour rendre le dashboard accessible via Tailscale :
+Ou directement :
+```bash
+streamlit run app.py
+```
 
-1. Assurez-vous que votre machine est connectée à Tailscale
-2. Le dashboard écoute sur `0.0.0.0:8050` par défaut
-3. Accédez au dashboard via l'IP Tailscale de votre machine : `http://[tailscale-ip]:8050`
+Le dashboard sera accessible sur `http://localhost:8501` avec **hot-reload automatique** ! 🎉
 
-Pour une configuration plus sécurisée, vous pouvez :
-- Ajouter une authentification au dashboard
-- Utiliser un reverse proxy (nginx) avec SSL
-- Restreindre l'accès par IP dans le code
-
-## Développement
-
-Pour développer localement sans Docker :
+### Option 2 : Avec Docker (Production)
 
 ```bash
-# Installer les dépendances avec Poetry (depuis la racine du projet)
+docker-compose up dashboard
+```
+
+Le volume mount (`./dashboard:/app`) permet déjà le hot-reload, mais un rebuild peut être nécessaire pour certaines dépendances.
+
+## 🔥 Hot-Reload
+
+Streamlit détecte automatiquement les changements dans :
+- ✅ Fichiers Python (`.py`)
+- ✅ Fichiers de configuration
+- ✅ Fichiers Markdown
+
+**Les changements sont appliqués automatiquement** - pas besoin de redémarrer !
+
+### Forcer un refresh
+
+Si le hot-reload ne fonctionne pas :
+1. Cliquer sur "Always rerun" dans le menu (⋮) de Streamlit
+2. Ou appuyer sur `R` dans le navigateur
+3. Ou utiliser le bouton refresh (↻) dans l'interface
+
+## 📝 Ajouter une nouvelle page
+
+1. Créer un nouveau fichier dans `pages/` :
+```python
+# pages/ma_nouvelle_page.py
+import streamlit as st
+
+def render():
+    """Affiche la nouvelle page"""
+    st.markdown("# Ma Nouvelle Page")
+    st.caption("Description de la page")
+    # Votre contenu ici
+```
+
+2. Importer dans `app.py` :
+```python
+from pages import ma_nouvelle_page
+```
+
+3. Ajouter le routage :
+```python
+elif "Ma Nouvelle Page" in page:
+    ma_nouvelle_page.render()
+```
+
+4. Ajouter l'option dans `components/sidebar.py` :
+```python
+page = st.radio(
+    "",
+    [
+        # ... autres pages
+        "🆕 Ma Nouvelle Page"
+    ]
+)
+```
+
+## 🎨 Personnalisation
+
+### Modifier les couleurs
+
+Éditer `config.py` :
+```python
+COLORS = {
+    'primary': '#6366F1',  # Votre couleur principale
+    'success': '#10B981',
+    # ...
+}
+```
+
+### Modifier les styles
+
+Éditer `components/styles.py` et la fonction `load_styles()`.
+
+### Modifier la configuration DB
+
+Éditer `config.py` ou utiliser les variables d'environnement dans `.env`.
+
+## 🔧 Dépendances
+
+### Installation locale
+
+```bash
+# Avec Poetry (recommandé)
 poetry install
 
-# Lancer le dashboard
-cd dashboard
-poetry run python app.py
+# Ou avec pip
+pip install streamlit plotly pandas psycopg2-binary python-dotenv
 ```
 
-## Structure
+### Variables d'environnement
 
-- `app.py` : Application Dash principale
-- `Dockerfile` : Image Docker pour le dashboard (utilise Poetry)
-- `README.md` : Ce fichier
+Créer un fichier `.env` à la racine du projet :
+```env
+DB_HOST=localhost
+DB_PORT=5434
+DB_NAME=receipt_processing
+DB_USER=receipt_user
+DB_PASSWORD=SuperSecretPassword123!
+```
 
-**Note** : Les dépendances sont gérées par Poetry dans le `pyproject.toml` à la racine du projet.
+## 📊 Fonctionnalités
 
+### ✅ Implémentées
+- Dashboard principal avec métriques
+- Filtres par date, catégorie et magasin
+- Sidebar avec navigation
+- Styles premium
+- Cache des données
+- Hot-reload pour le développement
+
+### 🚧 À venir
+- Page Analytics complète
+- Page Stores avec détails
+- Page Categories avec graphiques
+- Page History avec table complète
+- Page Transactions avec détails
+- Page Settings pour configuration
+
+## 🐛 Dépannage
+
+### Le dashboard ne se charge pas
+1. Vérifier que la base de données est accessible
+2. Vérifier les variables d'environnement dans `.env`
+3. Vérifier les logs : `docker-compose logs dashboard`
+
+### Les données ne s'affichent pas
+1. Vérifier la connexion à la base de données
+2. Vérifier que les tables existent
+3. Utiliser le bouton refresh (↻) pour rafraîchir le cache
+
+### Le hot-reload ne fonctionne pas
+1. Vérifier que `runOnSave = true` dans la config
+2. Vérifier que le fichier est sauvegardé
+3. Forcer un refresh avec `R` dans le navigateur
+4. Redémarrer Streamlit si nécessaire
+
+## 💡 Astuces de développement
+
+### Mode debug
+Ajouter `--logger.level=debug` pour plus de logs :
+```bash
+streamlit run app.py --logger.level=debug
+```
+
+### Voir les erreurs Python
+Les erreurs s'affichent directement dans le terminal où Streamlit tourne.
+
+### Clear le cache
+```python
+# Dans le code
+st.cache_data.clear()
+
+# Ou via l'interface
+Menu (⋮) > Clear cache
+```
+
+## 📚 Documentation
+
+Pour plus de détails sur chaque module, consulter les docstrings dans les fichiers Python.

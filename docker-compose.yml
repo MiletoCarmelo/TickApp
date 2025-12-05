@@ -76,7 +76,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${DASHBOARD_PORT:-8050}:8050"
+      - "${DASHBOARD_PORT:-8501}:8501"
     volumes:
       - ./dashboard:/app
     depends_on:

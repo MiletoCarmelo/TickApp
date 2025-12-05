@@ -23,10 +23,16 @@ RUN poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi --no-root
 
 # Copier le code de l'application dashboard
+# Note: Le volume mount dans docker-compose.yml monte ./dashboard dans /app
+# donc on ne copie que pour le build initial, le volume mount écrase ensuite
 COPY dashboard/ ./
+
+# Créer le dossier assets s'il n'existe pas déjà
+RUN mkdir -p assets
 
 # Exposer le port pour Streamlit
 EXPOSE 8501
 
-# Commande par défaut pour Streamlit
-CMD ["streamlit", "run", "app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
+# Commande par défaut pour Streamlit avec hot-reload
+# Le WORKDIR est /app, donc app.py est directement accessible
+CMD ["streamlit", "run", "app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true", "--server.runOnSave", "true", "--server.fileWatcherType", "poll"]

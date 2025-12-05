@@ -6,7 +6,7 @@ authors = ["mileto <carmeloenzomileto@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.14"
+python = ">=3.11,<3.13"
 dagster = "^1.12.3"
 python-dotenv = "^1.2.1"
 dagster-webserver = "^1.12.3"
@@ -16,10 +16,8 @@ alembic = "^1.17.2"
 psycopg2 = "^2.9.11"
 dagster-postgres = "^0.28.3"
 # Dashboard dependencies
-dash = "^2.14.2"
 plotly = "^5.18.0"
 pandas = "^2.1.4"
-dash-bootstrap-components = "^1.5.0"
 # Note: psycopg2 et python-dotenv sont déjà dans les dépendances principales
 streamlit = "^1.51.0"
 

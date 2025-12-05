@@ -1,0 +1,18 @@
+# Configuration Streamlit pour le développement
+[server]
+port = 8501
+address = "localhost"
+headless = false
+runOnSave = true
+fileWatcherType = "poll"
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+primaryColor = "#6366F1"
+backgroundColor = "#1e1e2e"
+secondaryBackgroundColor = "#25252d"
+textColor = "#E5E7EB"
+font = "Inter"
+
