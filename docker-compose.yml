@@ -29,9 +29,9 @@ services:
     networks:
       - receipt-network
     labels:
-      # Dashboard Traefik accessible via traefik.home.ts.net
+      # Dashboard Traefik accessible via traefik.home.tailc6fb0e.ts.net
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.home.ts.net`)"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.home.tailc6fb0e.ts.net`)"
       - "traefik.http.routers.traefik.service=api@internal"
       - "traefik.http.routers.traefik.entrypoints=web"
 
@@ -79,9 +79,9 @@ services:
     networks:
       - receipt-network
     labels:
-      # Accessible via pgadmin.home.ts.net
+      # Accessible via pgadmin.home.tailc6fb0e.ts.net
       - "traefik.enable=true"
-      - "traefik.http.routers.pgadmin.rule=Host(`pgadmin.home.ts.net`)"
+      - "traefik.http.routers.pgadmin.rule=Host(`pgadmin.home.tailc6fb0e.ts.net`)"
       - "traefik.http.routers.pgadmin.entrypoints=web"
       - "traefik.http.services.pgadmin.loadbalancer.server.port=80"
 
@@ -110,9 +110,9 @@ services:
     networks:
       - receipt-network
     labels:
-      # Accessible via dagster.home.ts.net
+      # Accessible via dagster.home.tailc6fb0e.ts.net
       - "traefik.enable=true"
-      - "traefik.http.routers.dagster.rule=Host(`dagster.home.ts.net`)"
+      - "traefik.http.routers.dagster.rule=Host(`dagster.home.tailc6fb0e.ts.net`)"
       - "traefik.http.routers.dagster.entrypoints=web"
       - "traefik.http.services.dagster.loadbalancer.server.port=3000"
 
@@ -135,9 +135,9 @@ services:
     networks:
       - receipt-network
     labels:
-      # Accessible via streamlit.home.ts.net
+      # Accessible via streamlit.home.tailc6fb0e.ts.net
       - "traefik.enable=true"
-      - "traefik.http.routers.streamlit.rule=Host(`streamlit.home.ts.net`)"
+      - "traefik.http.routers.streamlit.rule=Host(`streamlit.home.tailc6fb0e.ts.net`)"
       - "traefik.http.routers.streamlit.entrypoints=web"
       - "traefik.http.services.streamlit.loadbalancer.server.port=8501"
 
@@ -149,6 +149,7 @@ services:
     container_name: receipt-metabase
     restart: unless-stopped
     environment:
+      # Metabase utilise PostgreSQL pour stocker sa config
       MB_DB_TYPE: postgres
       MB_DB_DBNAME: metabase
       MB_DB_PORT: 5432
@@ -156,7 +157,7 @@ services:
       MB_DB_PASS: ${POSTGRES_PASSWORD}
       MB_DB_HOST: postgres
     ports:
-      - "3001:3000"  # ← Ajoute cette ligne : port 3001 sur ton Mac → 3000 dans le container
+    - "3001:3000" 
     volumes:
       - metabase_data:/metabase-data
     depends_on:
@@ -165,8 +166,9 @@ services:
     networks:
       - receipt-network
     labels:
+      # Accessible via metabase.home.tailc6fb0e.ts.net
       - "traefik.enable=true"
-      - "traefik.http.routers.metabase.rule=Host(`metabase.home.ts.net`)"
+      - "traefik.http.routers.metabase.rule=Host(`metabase.home.tailc6fb0e.ts.net`)"
       - "traefik.http.routers.metabase.entrypoints=web"
       - "traefik.http.services.metabase.loadbalancer.server.port=3000"
 
